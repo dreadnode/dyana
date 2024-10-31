@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # RUN apt-get update && apt-get install -y bpftrace
 
+COPY profiler.py .
 COPY loader.py .
 
 ENTRYPOINT ["python", "loader.py"]
