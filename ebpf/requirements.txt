@@ -2,3 +2,6 @@ transformers==4.45.1
 torch==2.5.0
 bcc==0.1.10
 psutil==6.1.0
+huggingface-hub==0.26.2
+numba==0.60.0
+pytest==8.3.3

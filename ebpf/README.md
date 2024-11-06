@@ -17,6 +17,9 @@ You can analyze the output to see:
 - Build and run the Docker container with privileged mode (required for eBPF):
 
 ```shell
+# Clean up previous builds
+docker system prune -a
+
 # Build the container
 docker build -t ebpf-model-tracer .
 
@@ -31,8 +34,8 @@ docker run --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \
     --cap-add=SYS_PTRACE \
-    -v $(pwd):/app \
-    ebpf-model-tracer loader.py
+    -v $(pwd):/app/mount \
+    ebpf-model-tracer mount/loader.py
 ```
 
 ## Inspiration
