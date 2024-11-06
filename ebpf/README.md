@@ -20,9 +20,10 @@ You can analyze the output to see:
 # Get the kernel version
 KERNEL_VERSION=$(uname -r)
 
-# Build and run
+# Build the image
 docker build -t ebpf-model-tracer .
 
+# Run the container with necessary privileges
 docker run --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \
