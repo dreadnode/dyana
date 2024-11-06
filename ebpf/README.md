@@ -43,6 +43,7 @@ docker run --privileged \
 multipass launch --name ebpf-dev --memory 4G --disk 10G
 
 # Mount your project directory - since this is a private repo
+# When you mount a local directory to Multipass, it creates a bidirectional sync. Changes made on either the host or guest will be reflected in both places immediately.
 multipass mount ~/git/dyana ebpf-dev:/home/ubuntu/project
 
 # Shell into VM
@@ -58,7 +59,7 @@ exit
 multipass shell ebpf-dev
 
 # Navigate to your mounted project directory
-cd /home/ubuntu/project/ebpf-repo
+cd /project/ebpf-repo
 
 ..
 
@@ -75,10 +76,13 @@ drwxr-xr-x 1 ubuntu ubuntu  320 Nov  6 09:08 ..
 -rw-r--r-- 1 ubuntu ubuntu  111 Nov  6 10:11 requirements.txt
 -rw-r--r-- 1 ubuntu ubuntu  520 Nov  6 08:57 test_model.py
 
-## Build the Docker image
+# Add your user to the docker group to run docker without sudo
+sudo usermod -aG docker ubuntu
+
+# Build the Docker image
 docker build -t ebpf-model-tracer .
 
-## Run the container with all necessary privileges
+# Run the container with all necessary privileges
 docker run --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \

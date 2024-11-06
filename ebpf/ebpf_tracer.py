@@ -16,6 +16,28 @@ bpf_text = """
 #include <linux/nsproxy.h>
 #include <linux/ns_common.h>
 
+// Tracepoint structures
+struct trace_entry {
+    unsigned short common_type;
+    unsigned char common_flags;
+    unsigned char common_preempt_count;
+    int common_pid;
+};
+
+struct trace_event_raw_sys_enter {
+    struct trace_entry ent;
+    long id;
+    unsigned long args[6];
+    char __data[0];
+};
+
+struct trace_event_raw_sys_exit {
+    struct trace_entry ent;
+    long id;
+    long ret;
+    char __data[0];
+};
+
 // Data structure to store syscall info
 struct syscall_event_t {
     u32 pid;
@@ -66,6 +88,7 @@ TRACEPOINT_PROBE(sched, sched_process_exit) {
 // Trace syscall entry
 TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     struct syscall_event_t event = {};
+    struct trace_event_raw_sys_enter *ctx = (struct trace_event_raw_sys_enter *)args;
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // Check if we're tracking this process
@@ -77,13 +100,13 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     event.pid = pid;
     event.tid = bpf_get_current_pid_tgid();
     event.timestamp = bpf_ktime_get_ns();
-    event.syscall_id = args->id;
+    event.syscall_id = ctx->id;
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
 
     // Capture syscall arguments
-    event.arg0 = args->args[0];
-    event.arg1 = args->args[1];
-    event.arg2 = args->args[2];
+    event.arg0 = ctx->args[0];
+    event.arg1 = ctx->args[1];
+    event.arg2 = ctx->args[2];
 
     // Special handling for file-related syscalls
     if (event.syscall_id == 257 || // openat
@@ -101,6 +124,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 // Trace syscall exit
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     struct syscall_event_t event = {};
+    struct trace_event_raw_sys_exit *ctx = (struct trace_event_raw_sys_exit *)args;
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // Check if we're tracking this process
@@ -112,8 +136,8 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     event.pid = pid;
     event.tid = bpf_get_current_pid_tgid();
     event.timestamp = bpf_ktime_get_ns();
-    event.syscall_id = args->id;
-    event.ret = args->ret;
+    event.syscall_id = ctx->id;
+    event.ret = ctx->ret;
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
 
     syscall_events.ringbuf_output(&event, sizeof(event), 0);
@@ -129,28 +153,33 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 
 class PythonTracer:
     def __init__(self):
-        self.bpf = BPF(text=bpf_text)
-        self.events = defaultdict(list)
-        self.memory_stats = defaultdict(list)
-        self.start_time = time.time()
-        print("BPF program loaded successfully")
+        try:
+            self.bpf = BPF(text=bpf_text)
+            self.events = defaultdict(list)
+            self.memory_stats = defaultdict(list)
+            self.start_time = time.time()
+            print("BPF program loaded successfully")
+        except Exception as e:
+            print(f"Failed to initialize BPF: {str(e)}")
+            raise
 
     def _process_event(self, cpu, data, size):
-        event = self.bpf["syscall_events"].event(data)
-
-        event_dict = {
-            "timestamp": event.timestamp,
-            "pid": event.pid,
-            "tid": event.tid,
-            "comm": event.comm.decode('utf-8', errors='replace'),
-            "syscall_id": event.syscall_id,
-            "args": [event.arg0, event.arg1, event.arg2],
-            "return_value": event.ret,
-            "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
-        }
-
-        self.events[event.pid].append(event_dict)
-        print(f"Captured syscall {event.syscall_id} from PID {event.pid}")
+        try:
+            event = self.bpf["syscall_events"].event(data)
+            event_dict = {
+                "timestamp": event.timestamp,
+                "pid": event.pid,
+                "tid": event.tid,
+                "comm": event.comm.decode('utf-8', errors='replace'),
+                "syscall_id": event.syscall_id,
+                "args": [event.arg0, event.arg1, event.arg2],
+                "return_value": event.ret,
+                "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
+            }
+            self.events[event.pid].append(event_dict)
+            print(f"Captured syscall {event.syscall_id} from PID {event.pid}")
+        except Exception as e:
+            print(f"Error processing event: {str(e)}")
 
     def _get_process_memory(self, pid):
         try:
@@ -168,50 +197,58 @@ class PythonTracer:
     def run_trace(self, python_script):
         print(f"Starting trace for {python_script}")
 
-        # Start tracing
-        self.bpf["syscall_events"].open_ring_buffer(self._process_event)
-
-        # Execute Python script
-        print("Launching Python process...")
-        python_process = os.spawnlp(
-            os.P_NOWAIT, "python3", "python3", python_script)
-        print(f"Started process with PID: {python_process}")
-
         try:
-            while True:
-                try:
-                    # Poll for events
-                    self.bpf.ring_buffer_poll()
+            # Start tracing
+            self.bpf["syscall_events"].open_ring_buffer(self._process_event)
 
-                    # Track memory usage
-                    mem_usage = self._get_process_memory(python_process)
-                    self.memory_stats[python_process].append({
-                        'timestamp': time.time() - self.start_time,
-                        'memory': mem_usage
-                    })
+            # Execute Python script
+            print("Launching Python process...")
+            python_process = os.spawnlp(
+                os.P_NOWAIT, "python3", "python3", python_script)
+            print(f"Started process with PID: {python_process}")
 
-                    # Print trace messages
-                    print(self.bpf.trace_fields())
-
-                    # Check if process is still running
-                    os.kill(python_process, 0)
-                    time.sleep(0.1)  # Prevent CPU spinning
-
-                except OSError as e:
-                    print(f"Process {python_process} finished: {str(e)}")
-                    break
-                except KeyboardInterrupt:
-                    print("Received interrupt signal")
-                    break
-
-        finally:
-            # Clean up
             try:
-                os.kill(python_process, signal.SIGTERM)
-            except:
-                pass
+                while True:
+                    try:
+                        # Poll for events
+                        self.bpf.ring_buffer_poll()
 
-        # Process results
+                        # Track memory usage
+                        mem_usage = self._get_process_memory(python_process)
+                        self.memory_stats[python_process].append({
+                            'timestamp': time.time() - self.start_time,
+                            'memory': mem_usage
+                        })
+
+                        # Print trace messages
+                        print(self.bpf.trace_fields())
+
+                        # Check if process is still running
+                        os.kill(python_process, 0)
+                        time.sleep(0.1)  # Prevent CPU spinning
+
+                    except OSError as e:
+                        print(f"Process {python_process} finished: {str(e)}")
+                        break
+                    except KeyboardInterrupt:
+                        print("Received interrupt signal")
+                        break
+
+            finally:
+                # Clean up
+                try:
+                    os.kill(python_process, signal.SIGTERM)
+                except:
+                    pass
+
+            # Process results
+            return self._generate_trace_data(python_script)
+
+        except Exception as e:
+            print(f"Error during tracing: {str(e)}")
+            raise
+
+    def _generate_trace_data(self, python_script):
         trace_data = {
             "metadata": {
                 "script": python_script,
@@ -265,26 +302,31 @@ def main():
         print("Usage: %s <python_script>" % sys.argv[0])
         sys.exit(1)
 
-    print("Initializing eBPF tracer...")
-    tracer = PythonTracer()
+    try:
+        print("Initializing eBPF tracer...")
+        tracer = PythonTracer()
 
-    print(f"Starting trace of {sys.argv[1]}...")
-    trace_data = tracer.run_trace(sys.argv[1])
+        print(f"Starting trace of {sys.argv[1]}...")
+        trace_data = tracer.run_trace(sys.argv[1])
 
-    # Save results
-    output_file = "trace_results.json"
-    with open(output_file, "w") as f:
-        json.dump(trace_data, indent=2, fp=f)
+        # Save results
+        output_file = "trace_results.json"
+        with open(output_file, "w") as f:
+            json.dump(trace_data, indent=2, fp=f)
 
-    print(f"\nTrace completed. Results saved to {output_file}")
-    print("\nSummary:")
-    print("--------")
-    for pid, data in trace_data["processes"].items():
-        print(f"PID {pid}:")
-        print(f"  Total syscalls: {data['event_count']}")
-        print(f"  Peak RSS: {data['peak_memory']['rss']:.2f} KB")
-        print(f"  Unique syscalls: {len(data['syscall_summary'])}")
-        print(f"  File operations: {len(data['file_operations'])}")
+        print(f"\nTrace completed. Results saved to {output_file}")
+        print("\nSummary:")
+        print("--------")
+        for pid, data in trace_data["processes"].items():
+            print(f"PID {pid}:")
+            print(f"  Total syscalls: {data['event_count']}")
+            print(f"  Peak RSS: {data['peak_memory']['rss']:.2f} KB")
+            print(f"  Unique syscalls: {len(data['syscall_summary'])}")
+            print(f"  File operations: {len(data['file_operations'])}")
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
