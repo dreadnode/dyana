@@ -83,6 +83,7 @@ sudo usermod -aG docker ubuntu
 docker build -t ebpf-model-tracer .
 
 # Run the container with all necessary privileges
+# When running the container, make sure to mount the debugfs and tracefs:
 docker run --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \
@@ -90,6 +91,7 @@ docker run --privileged \
     -v /lib/modules:/lib/modules:ro \
     -v /usr/src:/usr/src:ro \
     -v /sys/kernel/debug:/sys/kernel/debug:rw \
+    -v /sys/kernel/tracing:/sys/kernel/tracing:rw \
     -v $(pwd):/app/mount \
     --pid=host \
     ebpf-model-tracer mount/loader.py

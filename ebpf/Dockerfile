@@ -1,9 +1,8 @@
 FROM ubuntu:22.04
 
-# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies first
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-dev \
@@ -17,26 +16,19 @@ RUN apt-get update && apt-get install -y \
     gcc \
     make \
     build-essential \
+    libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -s /bin/bash appuser
-RUN mkdir /app && chown appuser:appuser /app
-
-# Switch to root temporarily to install system-wide packages
-USER root
-
-# Setup kernel headers
-RUN mkdir -p /lib/modules/$(uname -r)/build && \
-    ln -s /usr/src/linux-headers-$(uname -r) /lib/modules/$(uname -r)/build
+# Don't create a non-root user - run as root for BPF operations
+WORKDIR /app
 
 # Fix Python path for BCC
 ENV PYTHONPATH=/usr/lib/python3/dist-packages
 
-# Copy files with correct permissions
-COPY --chown=appuser:appuser ebpf_tracer.py /app/
-COPY --chown=appuser:appuser loader.py /app/
-COPY --chown=appuser:appuser requirements.txt /app/
+# Copy files
+COPY ebpf_tracer.py /app/
+COPY loader.py /app/
+COPY requirements.txt /app/
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
@@ -44,9 +36,7 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 # Make scripts executable
 RUN chmod +x /app/ebpf_tracer.py /app/loader.py
 
-# Switch to non-root user
-USER appuser
-WORKDIR /app
+# Set capabilities for BPF operations
+RUN setcap cap_sys_admin+eip /usr/bin/python3.10
 
-# Set the entrypoint
 ENTRYPOINT ["python3", "/app/ebpf_tracer.py"]

@@ -15,28 +15,7 @@ bpf_text = """
 #include <linux/fs.h>
 #include <linux/nsproxy.h>
 #include <linux/ns_common.h>
-
-// Tracepoint structures
-struct trace_entry {
-    unsigned short common_type;
-    unsigned char common_flags;
-    unsigned char common_preempt_count;
-    int common_pid;
-};
-
-struct trace_event_raw_sys_enter {
-    struct trace_entry ent;
-    long id;
-    unsigned long args[6];
-    char __data[0];
-};
-
-struct trace_event_raw_sys_exit {
-    struct trace_entry ent;
-    long id;
-    long ret;
-    char __data[0];
-};
+#include <linux/syscalls.h>
 
 // Data structure to store syscall info
 struct syscall_event_t {
@@ -53,17 +32,14 @@ struct syscall_event_t {
 };
 
 // Ringbuffer for events
-BPF_RINGBUF_OUTPUT(syscall_events, 1 << 24);
+BPF_RINGBUF_OUTPUT(syscall_events, 1 << 20);
 
 // Hash to track process info
 BPF_HASH(processes, u32, u32);
 
 // Track process creation
 TRACEPOINT_PROBE(sched, sched_process_exec) {
-    struct task_struct *task;
     char comm[TASK_COMM_LEN];
-
-    task = (struct task_struct *)bpf_get_current_task();
     bpf_get_current_comm(&comm, sizeof(comm));
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -86,9 +62,8 @@ TRACEPOINT_PROBE(sched, sched_process_exit) {
 }
 
 // Trace syscall entry
-TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
+RAW_TRACEPOINT_PROBE(sys_enter) {
     struct syscall_event_t event = {};
-    struct trace_event_raw_sys_enter *ctx = (struct trace_event_raw_sys_enter *)args;
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // Check if we're tracking this process
@@ -100,13 +75,17 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     event.pid = pid;
     event.tid = bpf_get_current_pid_tgid();
     event.timestamp = bpf_ktime_get_ns();
-    event.syscall_id = ctx->id;
+
+    // Get syscall ID and args from context
+    struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+    event.syscall_id = ctx->args[1];
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
 
-    // Capture syscall arguments
-    event.arg0 = ctx->args[0];
-    event.arg1 = ctx->args[1];
-    event.arg2 = ctx->args[2];
+    // Capture syscall arguments safely
+    bpf_probe_read(&event.arg0, sizeof(event.arg0), &regs->di);
+    bpf_probe_read(&event.arg1, sizeof(event.arg1), &regs->si);
+    bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->dx);
 
     // Special handling for file-related syscalls
     if (event.syscall_id == 257 || // openat
@@ -116,15 +95,12 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     }
 
     syscall_events.ringbuf_output(&event, sizeof(event), 0);
-    bpf_trace_printk("Syscall %d from process %d\\n", event.syscall_id, event.pid);
-
     return 0;
 }
 
 // Trace syscall exit
-TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
+RAW_TRACEPOINT_PROBE(sys_exit) {
     struct syscall_event_t event = {};
-    struct trace_event_raw_sys_exit *ctx = (struct trace_event_raw_sys_exit *)args;
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // Check if we're tracking this process
@@ -136,17 +112,11 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     event.pid = pid;
     event.tid = bpf_get_current_pid_tgid();
     event.timestamp = bpf_ktime_get_ns();
-    event.syscall_id = ctx->id;
-    event.ret = ctx->ret;
+    event.syscall_id = ctx->args[1];
+    event.ret = ctx->args[0];
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
 
     syscall_events.ringbuf_output(&event, sizeof(event), 0);
-
-    // Log interesting return values
-    if (event.ret < 0) {
-        bpf_trace_printk("Syscall %d failed with %d\\n", event.syscall_id, event.ret);
-    }
-
     return 0;
 }
 """
@@ -154,7 +124,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 class PythonTracer:
     def __init__(self):
         try:
-            self.bpf = BPF(text=bpf_text)
+            self.bpf = BPF(text=bpf_text, debug=4)
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
             self.start_time = time.time()
@@ -219,9 +189,6 @@ class PythonTracer:
                             'timestamp': time.time() - self.start_time,
                             'memory': mem_usage
                         })
-
-                        # Print trace messages
-                        print(self.bpf.trace_fields())
 
                         # Check if process is still running
                         os.kill(python_process, 0)
