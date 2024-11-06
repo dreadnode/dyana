@@ -1,0 +1,4 @@
+transformers==4.45.1
+torch==2.5.0
+bcc==0.1.10
+psutil==6.1.0
