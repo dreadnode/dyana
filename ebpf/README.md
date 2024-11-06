@@ -17,24 +17,21 @@ You can analyze the output to see:
 - Build and run the Docker container with privileged mode (required for eBPF):
 
 ```shell
-# Clean up previous builds
-docker system prune -a
+# Get the kernel version
+KERNEL_VERSION=$(uname -r)
 
-# Build the container
+# Build and run
 docker build -t ebpf-model-tracer .
 
-# Run the tracer with the test script
-docker run --privileged -v $(pwd):/app ebpf-model-tracer test_model.py
-```
-
-If you still get errors, you might need to run with additional privileges:
-
-```shell
 docker run --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \
     --cap-add=SYS_PTRACE \
+    -v /lib/modules:/lib/modules:ro \
+    -v /usr/src:/usr/src:ro \
+    -v /sys/kernel/debug:/sys/kernel/debug:rw \
     -v $(pwd):/app/mount \
+    --pid=host \
     ebpf-model-tracer mount/loader.py
 ```
 
