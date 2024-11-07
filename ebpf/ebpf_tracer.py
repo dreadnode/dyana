@@ -32,7 +32,7 @@ struct syscall_event_t {
 };
 
 // Ringbuffer for events
-BPF_RINGBUF_OUTPUT(syscall_events, 1 << 20);
+BPF_RINGBUF_OUTPUT(syscall_events, 1 << 13);  // 8KB = 8192 bytes
 
 // Hash to track process info
 BPF_HASH(processes, u32, u32);
