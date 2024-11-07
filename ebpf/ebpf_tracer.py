@@ -40,8 +40,9 @@ BPF_HASH(processes, u32, u32);
 // Track process creation
 TRACEPOINT_PROBE(sched, sched_process_exec) {
     char comm[TASK_COMM_LEN];
-    bpf_get_current_comm(&comm, sizeof(comm));
     u32 pid = bpf_get_current_pid_tgid() >> 32;
+
+    bpf_get_current_comm(&comm, sizeof(comm));
 
     // Track Python processes and their children
     if (memcmp(comm, "python", 6) == 0) {
@@ -55,9 +56,15 @@ TRACEPOINT_PROBE(sched, sched_process_exec) {
 // Track process exit
 TRACEPOINT_PROBE(sched, sched_process_exit) {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-    if (processes.delete(&pid)) {
-        bpf_trace_printk("Process %d exited\\n", pid);
+
+    // Check if we're tracking this process
+    u32 *exists = processes.lookup(&pid);
+    if (!exists) {
+        return 0;
     }
+
+    processes.delete(&pid);
+    bpf_trace_printk("Process %d exited\\n", pid);
     return 0;
 }
 
