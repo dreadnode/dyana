@@ -2,6 +2,16 @@
 
 This tool uses eBPF to trace and profile the runtime behavior of ML model loading and inference. It captures detailed system-level information including syscalls, memory usage, and process behavior.
 
+- [eBPF Runtime Profiler for ML Models](#ebpf-runtime-profiler-for-ml-models)
+  - [Output](#output)
+  - [Prerequisites](#prerequisites)
+  - [Quick Start](#quick-start)
+  - [Verifying Setup](#verifying-setup)
+  - [Troubleshooting](#troubleshooting)
+    - [Finding the Right Kernel Version](#finding-the-right-kernel-version)
+  - [Inspiration \& Credits](#inspiration--credits)
+  - [Notes](#notes)
+
 ## Output
 
 The tracer generates JSON data containing:
@@ -50,6 +60,21 @@ docker run -it --rm \
     -v /sys/kernel/debug:/sys/kernel/debug \
     --pid=host \
     ebpf-tracer
+```
+
+2.5. Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py)
+
+```shell
+➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
+    --privileged \
+    --cap-add=SYS_ADMIN \
+    --cap-add=SYS_RESOURCE \
+    --cap-add=SYS_PTRACE \
+    -v /sys/kernel/debug:/sys/kernel/debug \
+    -v $(pwd):/root/ebpf \
+    --pid=host \
+    ebpf-tracer \
+    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py"
 ```
 
 3. Inside the container, run the tracer:
