@@ -8,6 +8,27 @@ import signal
 import psutil
 from collections import defaultdict
 
+# Syscall number to name mapping
+SYSCALLS = {
+    0: "read",
+    1: "write",
+    2: "open",
+    3: "close",
+    9: "mmap",
+    32: "dup",
+    35: "nanosleep",
+    36: "getpid",
+    38: "clone",
+    57: "fork",
+    79: "getcwd",
+    93: "exit",
+    135: "sysfs",
+    215: "epoll_create",
+    233: "epoll_ctl",
+    257: "openat",
+    322: "execve"
+}
+
 # BPF program to trace syscalls and Python execution
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -148,18 +169,26 @@ class PythonTracer:
     def _process_event(self, cpu, data, size):
         try:
             event = self.bpf["syscall_events"].event(data)
+            syscall_name = SYSCALLS.get(event.syscall_id, f"syscall_{event.syscall_id}")
+
             event_dict = {
                 "timestamp": event.timestamp,
                 "pid": event.pid,
                 "tid": event.tid,
                 "comm": event.comm.decode('utf-8', errors='replace'),
                 "syscall_id": event.syscall_id,
+                "syscall_name": syscall_name,  # Add the syscall name
                 "args": [event.arg0, event.arg1, event.arg2],
                 "return_value": event.ret,
                 "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
             }
             self.events[event.pid].append(event_dict)
-            print(f"Captured syscall {event.syscall_id} from PID {event.pid}")
+
+            # More descriptive output
+            print(f"PID {event.pid}: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
+            if hasattr(event, 'filename') and event.filename:
+                print(f"  filename: {event.filename.decode('utf-8', errors='replace')}")
+
         except Exception as e:
             print(f"Error processing event: {str(e)}")
 
