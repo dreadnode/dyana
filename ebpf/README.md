@@ -100,6 +100,30 @@ FROM docker/for-desktop-kernel:<your-version> AS ksrc
 - We intentionally avoid mounting `/lib/modules` to prevent host kernel headers from overriding container setup
 - The tracer is designed to work with ARM64 architecture (Apple Silicon)
 
+- On x86, syscall arguments are passed in specific registers (di, si, dx)
+- On ARM64 (and other architectures), arguments are passed in a generic register array
+- regs->regs[0] always refers to the first argument regardless of architecture
+- This makes our code portable across different CPU architectures
+- ie:
+
+```python
+     * Architecture-agnostic argument access
+     * Works on any architecture including:
+     * - ARM64 (Apple Silicon)
+     * - x86_64
+     * - aarch64
+     */
+    #ifdef __x86_64__
+        bpf_probe_read(&event.arg0, sizeof(event.arg0), &regs->di);  // di register
+        bpf_probe_read(&event.arg1, sizeof(event.arg1), &regs->si);  // si register
+        bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->dx);  // dx register
+    #else
+        bpf_probe_read(&event.arg0, sizeof(event.arg0), &regs->regs[0]);  // First argument
+        bpf_probe_read(&event.arg1, sizeof(event.arg1), &regs->regs[1]);  // Second argument
+        bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->regs[2]);  // Third argument
+    #endif
+```
+
 <!-- ARCHIVE
 ```shell
 # Create VM if you haven't already
