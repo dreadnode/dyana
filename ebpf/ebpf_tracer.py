@@ -82,13 +82,6 @@ RAW_TRACEPOINT_PROBE(sys_enter) {
 
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
 
-    /*
-     * Architecture-agnostic argument access
-     * Works on any architecture including:
-     * - ARM64 (Apple Silicon)
-     * - x86_64
-     * - aarch64
-     */
     bpf_probe_read(&event.arg0, sizeof(event.arg0), &regs->regs[0]);
     bpf_probe_read(&event.arg1, sizeof(event.arg1), &regs->regs[1]);
     bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->regs[2]);
