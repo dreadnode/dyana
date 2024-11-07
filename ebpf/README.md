@@ -11,6 +11,7 @@ This tool uses eBPF to trace and profile the runtime behavior of ML model loadin
     - [Finding the Right Kernel Version](#finding-the-right-kernel-version)
   - [Inspiration \& Credits](#inspiration--credits)
   - [Notes](#notes)
+    - [Other useful debugging:](#other-useful-debugging)
 
 ## Output
 
@@ -148,6 +149,12 @@ FROM docker/for-desktop-kernel:<your-version> AS ksrc
         bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->regs[2]);  // Third argument
     #endif
 ```
+
+### Other useful debugging:
+
+- Check Tracepoint Availability:
+
+`root@63e1ebcdffc2:~# ls -al /sys/kernel/debug/tracing/events/sched/ `
 
 <!-- ARCHIVE
 ```shell
