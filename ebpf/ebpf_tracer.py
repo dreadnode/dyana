@@ -38,27 +38,33 @@ BPF_RINGBUF_OUTPUT(syscall_events, 1 << 13);  // 8KB = 8192 bytes
 BPF_HASH(processes, u32, u32);
 
 // Track process creation
-TRACEPOINT_PROBE(sched, sched_process_exec) {
+RAW_TRACEPOINT_PROBE(sched_process_exec) {
+    u32 pid;
+    u32 one = 1;
     char comm[TASK_COMM_LEN];
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
+    pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(&comm, sizeof(comm));
 
-    // Track Python processes and their children
-    if (memcmp(comm, "python", 6) == 0) {
-        processes.update(&pid, &pid);
-        bpf_trace_printk("Tracking Python process %d\\n", pid);
+    #pragma unroll
+    for (int i = 0; i < 6; i++) {
+        if (comm[i] != "python"[i]) {
+            return 0;
+        }
     }
 
+    processes.update(&pid, &one);
+    bpf_trace_printk("Tracking Python process %d\\n", pid);
     return 0;
 }
 
 // Track process exit
-TRACEPOINT_PROBE(sched, sched_process_exit) {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+RAW_TRACEPOINT_PROBE(sched_process_exit) {
+    u32 pid;
+    u32 *exists;
 
-    // Check if we're tracking this process
-    u32 *exists = processes.lookup(&pid);
+    pid = bpf_get_current_pid_tgid() >> 32;
+    exists = processes.lookup(&pid);
     if (!exists) {
         return 0;
     }
