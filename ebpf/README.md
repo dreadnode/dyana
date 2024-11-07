@@ -49,7 +49,7 @@ Or, if you prefer step by step:
 docker build -t ebpf-tracer .
 ```
 
-2. Run the tracer:
+2. Run the container in interactive mode:
 ```bash
 # Important: Do NOT mount /lib/modules as we need to use the container's kernel headers
 docker run -it --rm \
