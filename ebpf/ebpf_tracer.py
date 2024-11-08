@@ -152,10 +152,10 @@ RAW_TRACEPOINT_PROBE(sys_enter) {
     // Track memory allocations
     if (event.syscall_id == 9) {  // mmap
         u64 size = event.arg1;
-        u64 *current = memory_allocs.lookup(&pid);
+        u64 *curr_alloc = memory_allocs.lookup(&pid);  // renamed from 'current'
         u64 new_size = size;
-        if (current)
-            new_size += *current;
+        if (curr_alloc)
+            new_size += *curr_alloc;
         memory_allocs.update(&pid, &new_size);
 
         // Update peak if necessary
