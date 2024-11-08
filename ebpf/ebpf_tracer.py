@@ -268,9 +268,12 @@ class PythonTracer:
             process = psutil.Process(pid)
             memory_info = process.memory_info()
             return {
-                'rss': memory_info.rss / 1024,  # Resident Set Size in KB
-                'vms': memory_info.vms / 1024,  # Virtual Memory Size in KB
-                'shared': getattr(memory_info, 'shared', 0) / 1024  # Shared memory in KB
+                'timestamp': time.time(),  # Add timestamp
+                'memory': {
+                    'rss': memory_info.rss / 1024,
+                    'vms': memory_info.vms / 1024,
+                    'shared': getattr(memory_info, 'shared', 0) / 1024
+                }
             }
         except Exception as e:
             print(f"Error getting memory info for PID {pid}: {str(e)}")
