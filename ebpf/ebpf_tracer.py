@@ -388,6 +388,123 @@ class PythonTracer:
                 })
         return dict(file_ops)
 
+class ModelBehaviorAnalyzer:
+    def __init__(self, trace_data):
+        self.trace_data = trace_data
+        self.phases = {
+            'initialization': [],
+            'loading': [],
+            'inference': [],
+            'cleanup': []
+        }
+
+    def analyze(self):
+        for pid, process_data in self.trace_data['processes'].items():
+            events = process_data['events']
+            self._identify_phases(events)
+
+        return {
+            'phases': self.phases,
+            'security_profile': self._analyze_security(),
+            'resource_usage': self._analyze_resources(),
+            'file_access_patterns': self._analyze_file_access()
+        }
+
+    def _identify_phases(self, events):
+        if not events:
+            return
+
+        current_phase = 'initialization'
+        phase_start = events[0]['timestamp']
+
+        for event in events:
+            if self._is_model_loading(event):
+                if current_phase != 'loading':
+                    self._mark_phase_transition(current_phase, 'loading', phase_start, event['timestamp'])
+                    current_phase = 'loading'
+                    phase_start = event['timestamp']
+            elif self._is_inference(event):
+                if current_phase != 'inference':
+                    self._mark_phase_transition(current_phase, 'inference', phase_start, event['timestamp'])
+                    current_phase = 'inference'
+                    phase_start = event['timestamp']
+
+    def _mark_phase_transition(self, from_phase, to_phase, start_time, end_time):
+        self.phases[from_phase].append({
+            'start': start_time,
+            'end': end_time,
+            'duration': end_time - start_time
+        })
+
+    def _is_model_loading(self, event):
+        return (event['syscall_category'] == 'file_ops' and
+                event.get('filename') and
+                any(ext in event['filename'].lower()
+                    for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5']))
+
+    def _is_inference(self, event):
+        return (event['syscall_category'] == 'memory_ops' and
+                event['syscall_name'] == 'mmap' and
+                event['args'][1] > 1024 * 1024)  # Large memory allocations
+
+    def _analyze_security(self):
+        security_indicators = {
+            'suspicious_files': [],
+            'network_connections': [],
+            'unusual_syscalls': [],
+            'permission_escalation': []
+        }
+
+        for pid, process_data in self.trace_data['processes'].items():
+            for event in process_data['events']:
+                # Check for suspicious file access
+                if event.get('filename'):
+                    if any(path in event['filename']
+                          for path in ['/etc/', '/var/log/', '/root/']):
+                        security_indicators['suspicious_files'].append(event)
+
+                # Check for unusual syscalls
+                if event['syscall_category'] == 'unknown':
+                    security_indicators['unusual_syscalls'].append(event)
+
+        return security_indicators
+
+    def _analyze_resources(self):
+        return {
+            'memory_profile': self._analyze_memory_usage(),
+            'file_usage': self._analyze_file_usage()
+        }
+
+    def _analyze_memory_usage(self):
+        memory_profile = {
+            'peak_usage': 0,
+            'allocation_patterns': [],
+            'potential_leaks': []
+        }
+
+        for pid, process_data in self.trace_data['processes'].items():
+            peak_rss = process_data['peak_memory']['rss']
+            memory_profile['peak_usage'] = max(memory_profile['peak_usage'], peak_rss)
+
+        return memory_profile
+
+    def _analyze_file_usage(self):
+        return {
+            'total_files': sum(len(p['file_operations'])
+                             for p in self.trace_data['processes'].values()),
+            'access_patterns': self._get_file_access_patterns()
+        }
+
+    def _get_file_access_patterns(self):
+        patterns = defaultdict(int)
+        for pid, process_data in self.trace_data['processes'].items():
+            for op in process_data['file_operations'].values():
+                for access in op:
+                    ext = os.path.splitext(access['filename'])[1]
+                    if ext:
+                        patterns[ext] += 1
+        return dict(patterns)
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: %s <python_script>" % sys.argv[0])
