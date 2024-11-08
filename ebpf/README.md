@@ -9,6 +9,7 @@ This tool uses eBPF to trace and profile the runtime behavior of ML model loadin
   - [Verifying Setup](#verifying-setup)
   - [Troubleshooting](#troubleshooting)
     - [Finding the Right Kernel Version](#finding-the-right-kernel-version)
+    - [Run just the `loader.py`:](#run-just-the-loaderpy)
   - [Inspiration \& Credits](#inspiration--credits)
   - [Notes](#notes)
     - [Other useful debugging:](#other-useful-debugging)
@@ -111,7 +112,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py --path /root/model"
+    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py --path /root/model && ls -la traces/"
 ```
 
 1. Inside the container, run the tracer:
@@ -150,6 +151,31 @@ curl -s "https://registry.hub.docker.com/v2/repositories/docker/for-desktop-kern
 3. Update the Dockerfile's FROM line if needed:
 ```dockerfile
 FROM docker/for-desktop-kernel:<your-version> AS ksrc
+```
+
+### Run just the `loader.py`:
+
+```shell
+➜  ebpf git:(ebpf/ebpf-tracer-enhancements-v2) docker run -it --rm \
+    --privileged \
+    --cap-add=SYS_ADMIN \
+    --cap-add=SYS_RESOURCE \
+    --cap-add=SYS_PTRACE \
+    -v /sys/kernel/debug:/sys/kernel/debug \
+    -v $(pwd):/root/ebpf \
+    --pid=host \
+    ebpf-tracer \
+    sh -c "cd /root/ebpf && python3 loader.py"
+Loading model prajjwal1/bert-tiny...
+config.json: 100%|███████████████████████████████████████████████| 285/285 [00:00<00:00, 1.41MB/s]
+vocab.txt: 100%|███████████████████████████████████████████████| 232k/232k [00:00<00:00, 11.1MB/s]
+pytorch_model.bin: 100%|█████████████████████████████████████| 17.8M/17.8M [00:00<00:00, 70.8MB/s]
+Running inference 1/5...
+Running inference 2/5...
+Running inference 3/5...
+Running inference 4/5...
+Running inference 5/5...
+Model testing completed successfully!
 ```
 
 ## Inspiration & Credits
