@@ -112,7 +112,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py --path /root/model && ls -la traces/"
+    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py --path /root/model"
 ```
 
 1. Inside the container, run the tracer:
