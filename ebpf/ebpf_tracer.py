@@ -579,6 +579,12 @@ def main():
             for file in behavior_profile['security_profile']['suspicious_files']:
                 print(f"  Suspicious file access: {file['filename']}")
 
+        print("\nFile Access Patterns:")
+        print("-------------------")
+        for category, files in tracer.file_patterns.items():
+            if files:
+                print(f"  {category.replace('_', ' ').title()}: {len(files)} files")
+
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
