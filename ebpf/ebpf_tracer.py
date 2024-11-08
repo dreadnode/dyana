@@ -205,10 +205,37 @@ class PythonTracer:
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
             self.start_time = time.time()
+            # Add this new initialization
+            self.file_patterns = {
+                'model_files': [],
+                'weights': [],
+                'configs': [],
+                'temp_files': [],
+                'libraries': []
+            }
             print("BPF program loaded successfully")
         except Exception as e:
             print(f"Failed to initialize BPF: {str(e)}")
             raise
+
+    def _analyze_file_patterns(self, events):
+        for event in events:
+            if not event.get('filename'):
+                continue
+
+            filename = event['filename'].lower()
+
+            # Categorize files
+            if any(ext in filename for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5']):
+                self.file_patterns['model_files'].append(filename)
+            elif any(ext in filename for ext in ['.weight', '.weights', '.safetensors']):
+                self.file_patterns['weights'].append(filename)
+            elif any(ext in filename for ext in ['.json', '.yaml', '.config', '.cfg']):
+                self.file_patterns['configs'].append(filename)
+            elif any(ext in filename for ext in ['.so', '.dll', '.dylib']):
+                self.file_patterns['libraries'].append(filename)
+            elif '/tmp/' in filename or filename.startswith('/var/tmp/'):
+                self.file_patterns['temp_files'].append(filename)
 
     def _process_event(self, cpu, data, size):
         try:
