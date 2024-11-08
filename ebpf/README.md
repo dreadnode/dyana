@@ -83,7 +83,7 @@ docker run -it --rm \
     ebpf-tracer
 ```
 
-2.5a. Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py) and using default small model
+2.5a. Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) and using default small model
 
 ```shell
 ➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
@@ -98,7 +98,7 @@ docker run -it --rm \
     sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py"
 ```
 
-2.5b Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model
+2.5b Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model
 
 ```shell
 ➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
