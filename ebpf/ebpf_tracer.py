@@ -651,8 +651,9 @@ def main():
         logger.info("Initializing eBPF tracer...")
         tracer = PythonTracer()
 
-        logger.info(f"Starting trace of {sys.argv[1]}... (timeout: {timeout}s)")
-        trace_data = tracer.run_trace(sys.argv[1], timeout=timeout)
+        script_path = sys.argv[1]
+        logger.info(f"Starting trace of {script_path}... (timeout: {timeout}s)")
+        trace_data = tracer.run_trace(script_path, timeout=timeout)
 
         # Add behavior analysis
         analyzer = ModelBehaviorAnalyzer(trace_data)
@@ -668,6 +669,27 @@ def main():
         logger.info(f"\nTrace completed. Results saved to {output_file}")
         logger.info("\nSummary:")
         logger.info("--------")
+
+        # Try to get model path from loader's output files
+        model_path = None
+        try:
+            # Look for the most recent profile_*.json file
+            profile_files = [f for f in os.listdir('.') if f.startswith('profile_') and f.endswith('.json')]
+            if profile_files:
+                latest_profile = max(profile_files, key=os.path.getctime)
+                with open(latest_profile) as f:
+                    profile_data = json.load(f)
+                    model_path = profile_data.get('metadata', {}).get('model_path')
+        except Exception as e:
+            logger.debug(f"Could not read model path from profile: {e}")
+
+        # Print model info
+        if model_path:
+            print(f"Model scanned: {model_path}")
+        else:
+            print("Model path not found in profile data")
+        print()  # Add blank line for readability
+
         for pid, data in trace_data["processes"].items():
             print(f"PID {pid}:")
             print(f"  Total syscalls: {data['event_count']}")
