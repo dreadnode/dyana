@@ -225,7 +225,7 @@ class PythonTracer:
             filename = event['filename'].lower()
 
             # Categorize files
-            if any(ext in filename for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5']):
+            if any(ext in filename for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5', '.model', '.ckpt', '.pb']):
                 self.file_patterns['model_files'].append(filename)
             elif any(ext in filename for ext in ['.weight', '.weights', '.safetensors']):
                 self.file_patterns['weights'].append(filename)
