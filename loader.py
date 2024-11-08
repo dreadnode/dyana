@@ -190,9 +190,16 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     try:
+        # Add debug info about current directory
+        current_dir = os.getcwd()
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        logger.info(f"Current working directory: {current_dir}")
+        logger.info(f"Script directory: {script_dir}")
+
         # Create output directory if it doesn't exist
-        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'traces')
+        output_dir = os.path.join(script_dir, 'traces')
         os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created/verified output directory: {output_dir}")
 
         # Default test model if no path provided
         model_path = args.path
@@ -217,18 +224,17 @@ def main():
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             base_name = model_path.split('/')[-1]
             output_file = os.path.join(output_dir, f"profile_{base_name}_{timestamp}.json")
-            logger.info(f"No output path provided. Using default: {output_file}")
 
-        logger.info(f"Saving results to {output_file}")
-        with open(output_file, "w") as f:
-            json.dump(results, f, indent=2)
+        logger.info(f"Attempting to save results to: {output_file}")
+        try:
+            with open(output_file, "w") as f:
+                json.dump(results, f, indent=2)
+            logger.info(f"Successfully saved results to: {output_file}")
+        except Exception as e:
+            logger.error(f"Failed to save results: {str(e)}")
+            raise
 
         logger.info("Profiling completed successfully")
-
-        # Add debug logging
-        logger.info(f"Current working directory: {os.getcwd()}")
-        logger.info(f"Script location: {os.path.abspath(__file__)}")
-        logger.info(f"Output directory: {output_dir}")
 
     except Exception as e:
         logger.error(f"Fatal error during profiling: {str(e)}")

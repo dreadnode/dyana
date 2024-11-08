@@ -287,21 +287,44 @@ class PythonTracer:
                 'shared': 0
             }
 
-    def run_trace(self, python_script, timeout=60):
-        """Run the trace with proper error handling and timeout."""
-        def signal_handler(signum, frame):
-            logger.info("\nReceived interrupt signal, cleaning up...")
-            self._cleanup()
-            sys.exit(0)
+    def signal_handler(self, signum, frame):
+        """Handle interrupt signals."""
+        logger.info("\nReceived interrupt signal, cleaning up...")
+        if hasattr(self, 'process') and self.process:
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=5)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
 
-        signal.signal(signal.SIGINT, signal_handler)
+        # Save any collected data
+        try:
+            if hasattr(self, 'trace_data') and self.trace_data:
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                output_dir = os.path.join(os.getcwd(), 'traces')
+                os.makedirs(output_dir, exist_ok=True)
+                output_file = os.path.join(output_dir, f"trace_results_interrupted_{timestamp}.json")
+                with open(output_file, "w") as f:
+                    json.dump(self.trace_data, indent=2, fp=f)
+                logger.info(f"Saved partial trace data to {output_file}")
+        except Exception as e:
+            logger.error(f"Failed to save trace data during cleanup: {e}")
+
+        self._cleanup()
+        sys.exit(0)
+
+    def run_trace(self, command, timeout=120):
+        """Run the trace on a Python script."""
+        # Register signal handler
+        signal.signal(signal.SIGINT, self.signal_handler)
 
         try:
-            # Verify script exists
-            if not os.path.exists(python_script):
-                raise FileNotFoundError(f"Script not found: {python_script}")
-
-            logger.info(f"Starting trace of script: {python_script}")
+            # Split command if it's a string
+            if isinstance(command, str):
+                command = command.split()
 
             # Initialize data structures
             self.events = defaultdict(list)
@@ -312,9 +335,11 @@ class PythonTracer:
             self.bpf["syscall_events"].open_ring_buffer(self._process_event)
 
             # Run the Python script
-            process = subprocess.Popen(['python3', python_script],
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE)
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
 
             logger.info(f"Started process with PID: {process.pid}")
 
@@ -374,7 +399,7 @@ class PythonTracer:
                     break
 
             # Generate and return trace data
-            return self._generate_trace_data(python_script)
+            return self._generate_trace_data(command[1])  # Pass script path
 
         except Exception as e:
             logger.error(f"Error during tracing: {str(e)}")
@@ -642,29 +667,40 @@ class ModelBehaviorAnalyzer:
         return file_access
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         logger.error("Usage: %s <python_script>" % sys.argv[0])
         sys.exit(1)
 
     try:
         # Create output directory if it doesn't exist
-        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'traces')
+        current_dir = os.getcwd()
+        output_dir = os.path.join(current_dir, 'traces')
         os.makedirs(output_dir, exist_ok=True)
 
         timeout = 120  # 2 minute timeout
         logger.info("Initializing eBPF tracer...")
         tracer = PythonTracer()
 
-        script_path = sys.argv[1]
+        # Get script path and verify it exists
+        script_name = sys.argv[1]
+        script_path = os.path.abspath(script_name)
+        script_args = sys.argv[2:] if len(sys.argv) > 2 else []
+
+        if not os.path.exists(script_path):
+            raise FileNotFoundError(f"Script not found: {script_path}")
+
+        # Run the script with Python interpreter
+        command = ["/usr/bin/python3", script_path] + script_args
+        command_str = " ".join(command)
         logger.info(f"Starting trace of {script_path}... (timeout: {timeout}s)")
-        trace_data = tracer.run_trace(script_path, timeout=timeout)
+        trace_data = tracer.run_trace(command, timeout=timeout)
 
         # Add behavior analysis
         analyzer = ModelBehaviorAnalyzer(trace_data)
         behavior_profile = analyzer.analyze()
         trace_data['behavior_profile'] = behavior_profile
 
-        # Save results with absolute path
+        # Save results
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
         with open(output_file, "w") as f:
@@ -677,22 +713,23 @@ def main():
         # Try to get model path from loader's output files
         model_path = None
         try:
-            # Look for profile files in the same directory
-            profile_files = [f for f in os.listdir(output_dir) if f.startswith('profile_') and f.endswith('.json')]
+            profile_files = [f for f in os.listdir(output_dir)
+                           if f.startswith('profile_') and f.endswith('.json')]
             if profile_files:
-                latest_profile = max(profile_files, key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
+                latest_profile = max(profile_files,
+                                   key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
                 with open(os.path.join(output_dir, latest_profile)) as f:
                     profile_data = json.load(f)
                     model_path = profile_data.get('metadata', {}).get('model_path')
         except Exception as e:
             logger.debug(f"Could not read model path from profile: {e}")
 
-        # Print model info
+        # Print summary information
         if model_path:
             print(f"Model scanned: {model_path}")
         else:
             print("Model path not found in profile data")
-        print()  # Add blank line for readability
+        print()
 
         for pid, data in trace_data["processes"].items():
             print(f"PID {pid}:")
