@@ -495,6 +495,23 @@ class ModelBehaviorAnalyzer:
             peak_rss = process_data['peak_memory']['rss']
             memory_profile['peak_usage'] = max(memory_profile['peak_usage'], peak_rss)
 
+            # Track memory allocation patterns
+            allocs = defaultdict(int)
+            for event in process_data['events']:
+                if event['syscall_name'] == 'mmap':
+                    allocs['allocated'] += event['args'][1]
+                elif event['syscall_name'] == 'munmap':
+                    allocs['freed'] += event['args'][1]
+
+            # Check for potential leaks
+            if allocs['allocated'] - allocs['freed'] > 1024 * 1024:  # more than 1MB difference
+                memory_profile['potential_leaks'].append({
+                    'pid': pid,
+                    'allocated': allocs['allocated'],
+                    'freed': allocs['freed'],
+                    'difference': allocs['allocated'] - allocs['freed']
+                })
+
         return memory_profile
 
     def _analyze_file_usage(self):
