@@ -84,6 +84,8 @@ BPF_RINGBUF_OUTPUT(syscall_events, 1 << 13);  // 8KB = 8192 bytes
 
 // Hash to track process info
 BPF_HASH(processes, u32, u32);
+BPF_HASH(memory_allocs, u32, u64);  // Track memory allocations per PID
+BPF_HASH(memory_peaks, u32, u64);   // Track peak memory usage
 
 // Track process creation
 RAW_TRACEPOINT_PROBE(sched_process_exec) {
@@ -146,6 +148,21 @@ RAW_TRACEPOINT_PROBE(sys_enter) {
     bpf_probe_read(&event.arg0, sizeof(event.arg0), &regs->regs[0]);
     bpf_probe_read(&event.arg1, sizeof(event.arg1), &regs->regs[1]);
     bpf_probe_read(&event.arg2, sizeof(event.arg2), &regs->regs[2]);
+
+    // Track memory allocations
+    if (event.syscall_id == 9) {  // mmap
+        u64 size = event.arg1;
+        u64 *current = memory_allocs.lookup(&pid);
+        u64 new_size = size;
+        if (current)
+            new_size += *current;
+        memory_allocs.update(&pid, &new_size);
+
+        // Update peak if necessary
+        u64 *peak = memory_peaks.lookup(&pid);
+        if (!peak || new_size > *peak)
+            memory_peaks.update(&pid, &new_size);
+    }
 
     // Special handling for file-related syscalls
     if (event.syscall_id == 257 || // openat
