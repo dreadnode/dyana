@@ -209,6 +209,35 @@ class PythonTracer:
             logger.error(f"Failed to initialize BPF: {str(e)}")
             raise
 
+    def signal_handler(self, signum, frame):
+        """Handle interrupt signals."""
+        logger.info("\nReceived interrupt signal, cleaning up...")
+        if hasattr(self, 'process') and self.process:
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=5)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+
+        # Save any collected data
+        try:
+            if hasattr(self, 'trace_data') and self.trace_data:
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                output_dir = os.path.join(os.getcwd(), 'traces')
+                os.makedirs(output_dir, exist_ok=True)
+                output_file = os.path.join(output_dir, f"trace_results_interrupted_{timestamp}.json")
+                with open(output_file, "w") as f:
+                    json.dump(self.trace_data, indent=2, fp=f)
+                logger.info(f"Saved partial trace data to {output_file}")
+        except Exception as e:
+            logger.error(f"Failed to save trace data during cleanup: {e}")
+
+        self._cleanup()
+        sys.exit(0)
+
     def _analyze_file_patterns(self, events):
         """Analyze and categorize file access patterns."""
         for event in events:
@@ -286,35 +315,6 @@ class PythonTracer:
                 'vms': 0,
                 'shared': 0
             }
-
-    def signal_handler(self, signum, frame):
-        """Handle interrupt signals."""
-        logger.info("\nReceived interrupt signal, cleaning up...")
-        if hasattr(self, 'process') and self.process:
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except Exception:
-                try:
-                    self.process.kill()
-                except Exception:
-                    pass
-
-        # Save any collected data
-        try:
-            if hasattr(self, 'trace_data') and self.trace_data:
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                output_dir = os.path.join(os.getcwd(), 'traces')
-                os.makedirs(output_dir, exist_ok=True)
-                output_file = os.path.join(output_dir, f"trace_results_interrupted_{timestamp}.json")
-                with open(output_file, "w") as f:
-                    json.dump(self.trace_data, indent=2, fp=f)
-                logger.info(f"Saved partial trace data to {output_file}")
-        except Exception as e:
-            logger.error(f"Failed to save trace data during cleanup: {e}")
-
-        self._cleanup()
-        sys.exit(0)
 
     def run_trace(self, command, timeout=120):
         """Run the trace on a Python script."""
