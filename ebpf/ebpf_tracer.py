@@ -8,26 +8,53 @@ import signal
 import psutil
 from collections import defaultdict
 
-# Syscall number to name mapping
-SYSCALLS = {
-    0: "read",
-    1: "write",
-    2: "open",
-    3: "close",
-    9: "mmap",
-    32: "dup",
-    35: "nanosleep",
-    36: "getpid",
-    38: "clone",
-    57: "fork",
-    79: "getcwd",
-    93: "exit",
-    135: "sysfs",
-    215: "epoll_create",
-    233: "epoll_ctl",
-    257: "openat",
-    322: "execve"
+# Syscall categories and their mappings
+SYSCALL_CATEGORIES = {
+    'file_ops': {
+        2: "open",
+        3: "close",
+        257: "openat",
+    },
+    'process_ops': {
+        38: "clone",
+        57: "fork",
+        322: "execve",
+        93: "exit",
+    },
+    'memory_ops': {
+        9: "mmap",
+    },
+    'io_ops': {
+        0: "read",
+        1: "write",
+    },
+    'system_info': {
+        36: "getpid",
+        79: "getcwd",
+    },
+    'synchronization': {
+        35: "nanosleep",
+    },
+    'file_descriptors': {
+        32: "dup",
+    },
+    'filesystem': {
+        135: "sysfs",
+    },
+    'event_handling': {
+        215: "epoll_create",
+        233: "epoll_ctl",
+    }
 }
+
+# Flatten categories into SYSCALLS dict while preserving category info
+SYSCALLS = {}
+SYSCALL_TO_CATEGORY = {}
+
+for category, syscalls in SYSCALL_CATEGORIES.items():
+    for syscall_id, syscall_name in syscalls.items():
+        SYSCALLS[syscall_id] = syscall_name
+        SYSCALL_TO_CATEGORY[syscall_id] = category
 
 # BPF program to trace syscalls and Python execution
 bpf_text = """
@@ -170,6 +197,7 @@ class PythonTracer:
         try:
             event = self.bpf["syscall_events"].event(data)
             syscall_name = SYSCALLS.get(event.syscall_id, f"syscall_{event.syscall_id}")
+            category = SYSCALL_TO_CATEGORY.get(event.syscall_id, "unknown")
 
             event_dict = {
                 "timestamp": event.timestamp,
@@ -177,15 +205,16 @@ class PythonTracer:
                 "tid": event.tid,
                 "comm": event.comm.decode('utf-8', errors='replace'),
                 "syscall_id": event.syscall_id,
-                "syscall_name": syscall_name,  # Add the syscall name
+                "syscall_name": syscall_name,
+                "syscall_category": category,
                 "args": [event.arg0, event.arg1, event.arg2],
                 "return_value": event.ret,
                 "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
             }
             self.events[event.pid].append(event_dict)
 
-            # More descriptive output
-            print(f"PID {event.pid}: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
+            # Enhanced output with category
+            print(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
             if hasattr(event, 'filename') and event.filename:
                 print(f"  filename: {event.filename.decode('utf-8', errors='replace')}")
 
@@ -290,9 +319,19 @@ class PythonTracer:
 
     def _summarize_syscalls(self, events):
         syscall_counts = defaultdict(int)
+        category_counts = defaultdict(int)
+
         for event in events:
-            syscall_counts[event["syscall_id"]] += 1
-        return dict(syscall_counts)
+            syscall_id = event["syscall_id"]
+            category = event["syscall_category"]
+
+            syscall_counts[syscall_id] += 1
+            category_counts[category] += 1
+
+        return {
+            "by_syscall": dict(syscall_counts),
+            "by_category": dict(category_counts)
+        }
 
     def _summarize_file_operations(self, events):
         file_ops = defaultdict(list)
@@ -329,7 +368,9 @@ def main():
             print(f"PID {pid}:")
             print(f"  Total syscalls: {data['event_count']}")
             print(f"  Peak RSS: {data['peak_memory']['rss']:.2f} KB")
-            print(f"  Unique syscalls: {len(data['syscall_summary'])}")
+            print(f"  Syscall categories:")
+            for category, count in data['syscall_summary']['by_category'].items():
+                print(f"    - {category}: {count}")
             print(f"  File operations: {len(data['file_operations'])}")
 
     except Exception as e:
