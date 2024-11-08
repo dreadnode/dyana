@@ -225,6 +225,11 @@ def main():
 
         logger.info("Profiling completed successfully")
 
+        # Add debug logging
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Script location: {os.path.abspath(__file__)}")
+        logger.info(f"Output directory: {output_dir}")
+
     except Exception as e:
         logger.error(f"Fatal error during profiling: {str(e)}")
         sys.exit(1)
