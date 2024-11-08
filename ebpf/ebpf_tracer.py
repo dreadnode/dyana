@@ -647,6 +647,10 @@ def main():
         sys.exit(1)
 
     try:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'traces')
+        os.makedirs(output_dir, exist_ok=True)
+
         timeout = 120  # 2 minute timeout
         logger.info("Initializing eBPF tracer...")
         tracer = PythonTracer()
@@ -660,9 +664,9 @@ def main():
         behavior_profile = analyzer.analyze()
         trace_data['behavior_profile'] = behavior_profile
 
-        # Save results
+        # Save results with absolute path
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_file = f"trace_results_{timestamp}.json"
+        output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
         with open(output_file, "w") as f:
             json.dump(trace_data, indent=2, fp=f)
 
@@ -673,11 +677,11 @@ def main():
         # Try to get model path from loader's output files
         model_path = None
         try:
-            # Look for the most recent profile_*.json file
-            profile_files = [f for f in os.listdir('.') if f.startswith('profile_') and f.endswith('.json')]
+            # Look for profile files in the same directory
+            profile_files = [f for f in os.listdir(output_dir) if f.startswith('profile_') and f.endswith('.json')]
             if profile_files:
-                latest_profile = max(profile_files, key=os.path.getctime)
-                with open(latest_profile) as f:
+                latest_profile = max(profile_files, key=lambda x: os.path.getctime(os.path.join(output_dir, x)))
+                with open(os.path.join(output_dir, latest_profile)) as f:
                     profile_data = json.load(f)
                     model_path = profile_data.get('metadata', {}).get('model_path')
         except Exception as e:

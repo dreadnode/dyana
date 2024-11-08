@@ -190,6 +190,10 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     try:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'traces')
+        os.makedirs(output_dir, exist_ok=True)
+
         # Default test model if no path provided
         model_path = args.path
         if not model_path:
@@ -207,12 +211,12 @@ def main():
             "model": profiler_instance.profile_model(),
         }
 
-        # Default output filename if none provided
+        # Default output filename with absolute path
         output_file = args.output
         if not output_file:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             base_name = model_path.split('/')[-1]
-            output_file = f"profile_{base_name}_{timestamp}.json"
+            output_file = os.path.join(output_dir, f"profile_{base_name}_{timestamp}.json")
             logger.info(f"No output path provided. Using default: {output_file}")
 
         logger.info(f"Saving results to {output_file}")
