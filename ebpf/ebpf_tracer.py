@@ -205,7 +205,6 @@ class PythonTracer:
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
             self.start_time = time.time()
-            # Add this new initialization
             self.file_patterns = {
                 'model_files': [],
                 'weights': [],
@@ -257,7 +256,6 @@ class PythonTracer:
             }
             self.events[event.pid].append(event_dict)
 
-            # Enhanced output with category
             print(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
             if hasattr(event, 'filename') and event.filename:
                 print(f"  filename: {event.filename.decode('utf-8', errors='replace')}")
@@ -517,6 +515,11 @@ def main():
         print(f"Starting trace of {sys.argv[1]}...")
         trace_data = tracer.run_trace(sys.argv[1])
 
+        # Add behavior analysis
+        analyzer = ModelBehaviorAnalyzer(trace_data)
+        behavior_profile = analyzer.analyze()
+        trace_data['behavior_profile'] = behavior_profile
+
         # Save results
         output_file = "trace_results.json"
         with open(output_file, "w") as f:
@@ -533,6 +536,20 @@ def main():
             for category, count in data['syscall_summary']['by_category'].items():
                 print(f"    - {category}: {count}")
             print(f"  File operations: {len(data['file_operations'])}")
+
+        print("\nBehavior Analysis:")
+        print("----------------")
+        print("Execution Phases:")
+        for phase, events in behavior_profile['phases'].items():
+            if events:
+                print(f"  {phase.title()}:")
+                print(f"    Duration: {events[-1]['end'] - events[0]['start']:.2f}ns")
+                print(f"    Events: {len(events)}")
+
+        if behavior_profile['security_profile']['suspicious_files']:
+            print("\nSecurity Alerts:")
+            for file in behavior_profile['security_profile']['suspicious_files']:
+                print(f"  Suspicious file access: {file['filename']}")
 
     except Exception as e:
         print(f"Error: {str(e)}")
