@@ -22,6 +22,26 @@ The tracer generates JSON data containing:
 - Execution duration
 - File operations
 
+- `-PythonTracer` class with all essential methods:
+    - `__init__`
+    - `_analyze_file_patterns`
+    - `_process_event`
+    - `_get_process_memory`
+    - `run_trace` (needs to be added)
+- `ModelBehaviorAnalyzer` class with all analysis methods:
+    - `__init__`
+    - `analyze`
+    - `_identify_phases`
+    - `_is_cleanup`
+    - `_mark_phase_transition`
+    - `_is_model_loading`
+    - `_is_inference`
+    - `_analyze_security`
+    - `_analyze_resources`
+    - `_analyze_memory_usage`
+    - `_analyze_file_usage`
+    - `_get_file_access_patterns`
+
 ## Prerequisites
 
 - Docker Desktop for Mac with virtualization support
