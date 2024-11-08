@@ -426,6 +426,17 @@ class ModelBehaviorAnalyzer:
                     self._mark_phase_transition(current_phase, 'inference', phase_start, event['timestamp'])
                     current_phase = 'inference'
                     phase_start = event['timestamp']
+            # cleanup phase detection
+            elif self._is_cleanup(event):
+                if current_phase != 'cleanup':
+                    self._mark_phase_transition(current_phase, 'cleanup', phase_start, event['timestamp'])
+                    current_phase = 'cleanup'
+                    phase_start = event['timestamp']
+
+    def _is_cleanup(self, event):
+        return (event['syscall_category'] == 'file_ops' and
+                event['syscall_name'] in ['close', 'munmap'] and
+                event['args'][0] > 0)
 
     def _mark_phase_transition(self, from_phase, to_phase, start_time, end_time):
         self.phases[from_phase].append({
