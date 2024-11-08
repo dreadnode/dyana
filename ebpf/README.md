@@ -63,7 +63,7 @@ docker run -it --rm \
     ebpf-tracer
 ```
 
-2.5. Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py)
+2.5a. Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py) and using default small model
 
 ```shell
 ➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
@@ -78,9 +78,27 @@ docker run -it --rm \
     sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py"
 ```
 
-3. Inside the container, run the tracer:
+2.5b Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model
+
+```shell
+➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
+    --privileged \
+    --cap-add=SYS_ADMIN \
+    --cap-add=SYS_RESOURCE \
+    --cap-add=SYS_PTRACE \
+    -v /sys/kernel/debug:/sys/kernel/debug \
+    -v /path/to/your/model:/root/model \
+    -v $(pwd):/root/ebpf \
+    --pid=host \
+    ebpf-tracer \
+    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py --path /root/model"
+```
+
+1. Inside the container, run the tracer:
 ```bash
-python3 /root/ebpf_tracer.py /root/loader.py
+python3 ebpf_tracer.py "loader.py"  # Uses default test model
+# or
+python3 ebpf_tracer.py "loader.py --path /root/model"
 ```
 
 ## Verifying Setup
