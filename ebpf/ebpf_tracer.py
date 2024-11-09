@@ -194,19 +194,19 @@ class PythonTracer:
     def __init__(self):
         """Initialize the Python tracer."""
         try:
-            self.bpf = BPF(text=bpf_text, debug=4)
+            self.bpf = BPF(text=bpf_text, debug=0)
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
             self.start_time = time.time()
-            # Initialize all tracking structures
+            # Initialize tracking structures
+            self.file_operations = defaultdict(list)
             self.file_patterns = {
                 'model_files': [],
-                'weights': [],
                 'configs': [],
                 'temp_files': [],
-                'libraries': []
+                'libraries': [],
+                'weights': []
             }
-            self.file_operations = defaultdict(list)
             self.phases = defaultdict(list)
             logger.info("BPF program loaded successfully")
         except Exception as e:
@@ -242,31 +242,6 @@ class PythonTracer:
         self._cleanup()
         sys.exit(0)
 
-    def _analyze_file_patterns(self, events):
-        """Analyze and categorize file access patterns."""
-        for event in events:
-            if not event.get('filename'):
-                continue
-
-            filename = event['filename'].lower()
-
-            # Categorize files
-            if any(ext in filename for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5', '.model', '.ckpt', '.pb']):
-                self.file_patterns['model_files'].append(filename)
-                logger.debug(f"Model file accessed: {filename}")
-            elif any(ext in filename for ext in ['.weight', '.weights', '.safetensors']):
-                self.file_patterns['weights'].append(filename)
-                logger.debug(f"Weight file accessed: {filename}")
-            elif any(ext in filename for ext in ['.json', '.yaml', '.config', '.cfg']):
-                self.file_patterns['configs'].append(filename)
-                logger.debug(f"Config file accessed: {filename}")
-            elif any(ext in filename for ext in ['.so', '.dll', '.dylib']):
-                self.file_patterns['libraries'].append(filename)
-                logger.debug(f"Library file accessed: {filename}")
-            elif '/tmp/' in filename or filename.startswith('/var/tmp/'):
-                self.file_patterns['temp_files'].append(filename)
-                logger.debug(f"Temp file accessed: {filename}")
-
     def _process_event(self, cpu, data, size):
         """Process each syscall event from the ring buffer."""
         try:
@@ -298,7 +273,11 @@ class PythonTracer:
 
             # Track file operations
             if filename and category == 'file_ops':
-                # Store file operation
+                # Initialize file_operations if not exists
+                #if not hasattr(self, 'file_operations'):
+                #    self.file_operations = defaultdict(list)
+
+                ## Store file operation
                 self.file_operations[event.pid].append({
                     'timestamp': event.timestamp,
                     'operation': syscall_name,
@@ -306,7 +285,17 @@ class PythonTracer:
                     'result': event.ret
                 })
 
-                # Categorize file access patterns
+                ## Initialize file_patterns if not exists
+                #if not hasattr(self, 'file_patterns'):
+                #    self.file_patterns = {
+                #        'model_files': [],
+                #        'configs': [],
+                #        'temp_files': [],
+                #        'libraries': [],
+                #        'weights': []
+                #    }
+
+                # Categorize file access patterns - for real-time tracking of unique files
                 if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
                     self.file_patterns['model_files'].append(filename)
                 elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
@@ -321,6 +310,10 @@ class PythonTracer:
             # Track execution phases
             if "=== " in comm and " PHASE " in comm:
                 phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower()
+                # Initialize phases if not exists
+                if not hasattr(self, 'phases'):
+                    self.phases = defaultdict(list)
+
                 self.phases[phase_name].append({
                     'start': event.timestamp,
                     'end': event.timestamp + 1000000,  # Add 1ms duration
@@ -367,10 +360,10 @@ class PythonTracer:
             logger.info(f"Starting trace of script: {script_name}")
 
             # Initialize data structures
-            self.events = defaultdict(list)
-            self.memory_stats = defaultdict(list)
-            self.file_patterns = defaultdict(list)
-            self.phases = defaultdict(list)
+            # self.events = defaultdict(list)
+            # self.memory_stats = defaultdict(list)
+            # self.file_patterns = defaultdict(list)
+            # self.phases = defaultdict(list)
 
             # Start tracing
             self.bpf["syscall_events"].open_ring_buffer(self._process_event)
@@ -444,7 +437,7 @@ class PythonTracer:
             # Generate trace data
             trace_data = self._generate_trace_data(command[1])
 
-            # Save results (only save once here)
+            # Save results
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
             os.makedirs(output_dir, exist_ok=True)
@@ -484,20 +477,20 @@ class PythonTracer:
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             },
             "processes": {},
-            "phases": dict(self.phases),
-            "file_patterns": {k: list(set(v)) for k, v in self.file_patterns.items()}
+            "phases": dict(self.phases),  # Convert defaultdict to regular dict
+            "file_patterns": {k: list(set(v)) for k, v in self.file_patterns.items()}  # Deduplicate files
         }
 
+        # Process data for each PID
         for pid, events in self.events.items():
+            file_ops = self._summarize_file_operations(events)
             memory_data = self.memory_stats.get(int(pid), [])
-            syscall_summary = self._summarize_syscalls(events)
-            file_operations = self._summarize_file_operations(events)
 
             trace_data["processes"][str(pid)] = {
                 "events": events,
                 "event_count": len(events),
-                "syscall_summary": syscall_summary,
-                "file_operations": file_operations,
+                "syscall_summary": self._summarize_syscalls(events),
+                "file_operations": file_ops,  # This is now a list
                 "memory_profile": memory_data,
                 "peak_memory": {
                     'rss': max([m['memory']['rss'] for m in memory_data], default=0),
@@ -525,15 +518,17 @@ class PythonTracer:
         }
 
     def _summarize_file_operations(self, events):
-        file_ops = defaultdict(list)
-        for event in events:
-            if event.get('filename'):
-                file_ops[event['syscall_id']].append({
-                    'filename': event['filename'],
-                    'timestamp': event['timestamp'],
-                    'result': event['return_value']
-                })
-        return dict(file_ops)
+        """Summarize file operations from the collected events."""
+        if not hasattr(self, 'file_operations'):
+            return []
+
+        # Get the pid from the first event
+        pid = events[0]['pid'] if events else None
+        if not pid:
+            return []
+
+        # Return the file operations for this pid
+        return self.file_operations.get(pid, [])
 
 class ModelBehaviorAnalyzer:
     def __init__(self, trace_data):
@@ -683,20 +678,22 @@ class ModelBehaviorAnalyzer:
         return memory_profile
 
     def _analyze_file_usage(self):
+        """Analyze file usage patterns."""
         return {
             'total_files': sum(len(p['file_operations'])
-                             for p in self.trace_data['processes'].values()),
+                              for p in self.trace_data['processes'].values()),
             'access_patterns': self._get_file_access_patterns()
         }
 
     def _get_file_access_patterns(self):
+        """Analyze file access patterns from the trace data."""
         patterns = defaultdict(int)
         for pid, process_data in self.trace_data['processes'].items():
-            for op in process_data['file_operations'].values():
-                for access in op:
-                    ext = os.path.splitext(access['filename'])[1]
-                    if ext:
-                        patterns[ext] += 1
+            # file_operations is now a list, not a dict
+            for op in process_data['file_operations']:  # Remove .values()
+                ext = os.path.splitext(op['filename'])[1]
+                if ext:
+                    patterns[ext] += 1
         return dict(patterns)
 
     def _analyze_file_access(self):
@@ -723,7 +720,7 @@ class ModelBehaviorAnalyzer:
                     elif event['syscall_name'] == 'write':
                         file_access['summary']['writes'] += 1
 
-                    # Categorize file types
+                    # Categorize file types - for operation counts and summary stats
                     if any(ext in filename for ext in ['.bin', '.pt', '.pth', '.onnx', '.h5']):
                         file_access['summary']['model_files'] += 1
                     elif any(ext in filename for ext in ['.json', '.yaml', '.config']):
