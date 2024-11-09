@@ -192,11 +192,13 @@ RAW_TRACEPOINT_PROBE(sys_exit) {
 
 class PythonTracer:
     def __init__(self):
+        """Initialize the Python tracer."""
         try:
             self.bpf = BPF(text=bpf_text, debug=4)
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
             self.start_time = time.time()
+            # Initialize all tracking structures
             self.file_patterns = {
                 'model_files': [],
                 'weights': [],
@@ -204,6 +206,8 @@ class PythonTracer:
                 'temp_files': [],
                 'libraries': []
             }
+            self.file_operations = defaultdict(list)
+            self.phases = defaultdict(list)
             logger.info("BPF program loaded successfully")
         except Exception as e:
             logger.error(f"Failed to initialize BPF: {str(e)}")
@@ -266,59 +270,69 @@ class PythonTracer:
     def _process_event(self, cpu, data, size):
         """Process each syscall event from the ring buffer."""
         try:
-            logger.debug(f"Received event: cpu={cpu}, size={size}")
             event = self.bpf["syscall_events"].event(data)
             syscall_name = SYSCALLS.get(event.syscall_id, f"syscall_{event.syscall_id}")
             category = SYSCALL_TO_CATEGORY.get(event.syscall_id, "unknown")
+
+            # Decode filename if present
+            filename = event.filename.decode('utf-8', errors='replace') if event.filename else None
+
+            # Decode command
+            comm = event.comm.decode('utf-8', errors='replace')
 
             event_dict = {
                 "timestamp": event.timestamp,
                 "pid": event.pid,
                 "tid": event.tid,
-                "comm": event.comm.decode('utf-8', errors='replace'),
+                "comm": comm,
                 "syscall_id": event.syscall_id,
                 "syscall_name": syscall_name,
                 "syscall_category": category,
                 "args": [event.arg0, event.arg1, event.arg2],
                 "return_value": event.ret,
-                "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
+                "filename": filename
             }
 
-            logger.debug(f"Processing event: {event_dict}")
+            # Store the event
             self.events[event.pid].append(event_dict)
 
-            # Analyze file patterns for this event
-            if event_dict.get('filename'):
-                self._analyze_file_patterns([event_dict])
+            # Track file operations
+            if filename and category == 'file_ops':
+                # Store file operation
+                self.file_operations[event.pid].append({
+                    'timestamp': event.timestamp,
+                    'operation': syscall_name,
+                    'filename': filename,
+                    'result': event.ret
+                })
 
-                # Track file operations
-                if category == 'file_ops':
-                    filename = event_dict['filename']
-                    if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
-                        self.file_patterns['model_files'].append(filename)
-                    elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
-                        self.file_patterns['configs'].append(filename)
-                    elif '/tmp/' in filename:
-                        self.file_patterns['temp_files'].append(filename)
-                    elif '.so' in filename or '.py' in filename:
-                        self.file_patterns['libraries'].append(filename)
-                    elif '.weight' in filename or '.bias' in filename:
-                        self.file_patterns['weights'].append(filename)
+                # Categorize file access patterns
+                if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
+                    self.file_patterns['model_files'].append(filename)
+                elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
+                    self.file_patterns['configs'].append(filename)
+                elif '/tmp/' in filename:
+                    self.file_patterns['temp_files'].append(filename)
+                elif '.so' in filename or '.py' in filename:
+                    self.file_patterns['libraries'].append(filename)
+                elif '.weight' in filename or '.bias' in filename:
+                    self.file_patterns['weights'].append(filename)
 
-            # Check for phase markers in process output
-            if "=== " in event_dict['comm'] and " PHASE " in event_dict['comm']:
-                phase_name = event_dict['comm'].split("===")[1].split("PHASE")[0].strip().lower()
-                if not hasattr(self, 'phases'):
-                    self.phases = defaultdict(list)
+            # Track execution phases
+            if "=== " in comm and " PHASE " in comm:
+                phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower()
                 self.phases[phase_name].append({
                     'start': event.timestamp,
                     'end': event.timestamp + 1000000,  # Add 1ms duration
-                    'pid': event.pid
+                    'pid': event.pid,
+                    'event': event_dict
                 })
+                logger.debug(f"Detected phase: {phase_name}")
 
+            # Debug logging
             logger.debug(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
-            if hasattr(event, 'filename') and event.filename:
-                logger.debug(f"  filename: {event.filename.decode('utf-8', errors='replace')}")
+            if filename:
+                logger.debug(f"  filename: {filename}")
 
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
@@ -430,7 +444,7 @@ class PythonTracer:
             # Generate trace data
             trace_data = self._generate_trace_data(command[1])
 
-            # Save the trace data
+            # Save results (only save once here)
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
             os.makedirs(output_dir, exist_ok=True)
@@ -523,12 +537,22 @@ class PythonTracer:
 
 class ModelBehaviorAnalyzer:
     def __init__(self, trace_data):
+        """Initialize the behavior analyzer."""
         self.trace_data = trace_data
+        # Initialize phases with empty lists
         self.phases = {
             'initialization': [],
             'loading': [],
             'inference': [],
             'cleanup': []
+        }
+        # Add file patterns tracking
+        self.file_patterns = {
+            'model_files': [],
+            'weights': [],
+            'configs': [],
+            'temp_files': [],
+            'libraries': []
         }
 
     def analyze(self):
