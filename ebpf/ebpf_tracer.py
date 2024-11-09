@@ -266,7 +266,7 @@ class PythonTracer:
     def _process_event(self, cpu, data, size):
         """Process each syscall event from the ring buffer."""
         try:
-            logger.debug(f"Received event: cpu={cpu}, size={size}")  # Add this line
+            logger.debug(f"Received event: cpu={cpu}, size={size}")
             event = self.bpf["syscall_events"].event(data)
             syscall_name = SYSCALLS.get(event.syscall_id, f"syscall_{event.syscall_id}")
             category = SYSCALL_TO_CATEGORY.get(event.syscall_id, "unknown")
@@ -284,12 +284,37 @@ class PythonTracer:
                 "filename": event.filename.decode('utf-8', errors='replace') if hasattr(event, 'filename') else None
             }
 
-            logger.debug(f"Processing event: {event_dict}")  # Add this line
+            logger.debug(f"Processing event: {event_dict}")
             self.events[event.pid].append(event_dict)
 
             # Analyze file patterns for this event
             if event_dict.get('filename'):
                 self._analyze_file_patterns([event_dict])
+
+                # Track file operations
+                if category == 'file_ops':
+                    filename = event_dict['filename']
+                    if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
+                        self.file_patterns['model_files'].append(filename)
+                    elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
+                        self.file_patterns['configs'].append(filename)
+                    elif '/tmp/' in filename:
+                        self.file_patterns['temp_files'].append(filename)
+                    elif '.so' in filename or '.py' in filename:
+                        self.file_patterns['libraries'].append(filename)
+                    elif '.weight' in filename or '.bias' in filename:
+                        self.file_patterns['weights'].append(filename)
+
+            # Check for phase markers in process output
+            if "=== " in event_dict['comm'] and " PHASE " in event_dict['comm']:
+                phase_name = event_dict['comm'].split("===")[1].split("PHASE")[0].strip().lower()
+                if not hasattr(self, 'phases'):
+                    self.phases = defaultdict(list)
+                self.phases[phase_name].append({
+                    'start': event.timestamp,
+                    'end': event.timestamp + 1000000,  # Add 1ms duration
+                    'pid': event.pid
+                })
 
             logger.debug(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
             if hasattr(event, 'filename') and event.filename:
@@ -318,18 +343,20 @@ class PythonTracer:
 
     def run_trace(self, command, timeout=120):
         """Run the trace on a Python script."""
-        # Register signal handler
-        signal.signal(signal.SIGINT, self.signal_handler)
-
         try:
             # Split command if it's a string
             if isinstance(command, str):
                 command = command.split()
 
+            script_name = os.path.basename(command[1])
+            logger.info(f"Starting trace of {script_name}... (timeout: {timeout}s)")
+            logger.info(f"Starting trace of script: {script_name}")
+
             # Initialize data structures
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
-            self.file_patterns = defaultdict(set)
+            self.file_patterns = defaultdict(list)
+            self.phases = defaultdict(list)
 
             # Start tracing
             self.bpf["syscall_events"].open_ring_buffer(self._process_event)
@@ -338,76 +365,91 @@ class PythonTracer:
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                cwd=os.path.dirname(command[1])
             )
 
             logger.info(f"Started process with PID: {process.pid}")
-
-            start_time = time.time()
-            last_log_time = start_time
             logger.info(f"Tracing process (will timeout after {timeout}s)...")
 
-            while True:
-                try:
-                    # Poll events
-                    self.bpf.ring_buffer_poll(30)  # 30ms timeout
+            # Store process for cleanup
+            self.process = process
 
-                    # Check if process has finished
-                    if process.poll() is not None:
-                        stdout, stderr = process.communicate()
-                        if process.returncode != 0:
-                            logger.warning(f"Process exited with code {process.returncode}")
-                            logger.warning(f"stderr: {stderr.decode('utf-8', errors='replace')}")
-                            logger.warning(f"stdout: {stdout.decode('utf-8', errors='replace')}")
+            # Monitor the process
+            start_time = time.time()
+            logger.info("Starting event polling loop...")
+
+            while process.poll() is None:
+                try:
+                    # Poll for events
+                    logger.debug("Polling for events...")
+                    events = self.bpf.ring_buffer_poll()
+                    logger.debug(f"Received {events} events")
+
+                    # Check memory usage
+                    try:
+                        proc = psutil.Process(process.pid)
+                        with proc.oneshot():
+                            memory_info = proc.memory_full_info()
+                            self.memory_stats[process.pid].append({
+                                'timestamp': time.time(),
+                                'memory': {
+                                    'rss': memory_info.rss / 1024,
+                                    'vms': memory_info.vms / 1024,
+                                    'shared': memory_info.shared / 1024
+                                }
+                            })
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        logger.debug("Process no longer exists or access denied")
                         break
 
                     # Check timeout
-                    current_time = time.time()
-                    elapsed = current_time - start_time
-
-                    if current_time - last_log_time >= 30:
-                        logger.info(f"Still tracing... ({int(elapsed)}s elapsed)")
-                        last_log_time = current_time
-
+                    elapsed = time.time() - start_time
                     if elapsed > timeout:
                         logger.warning(f"Trace timed out after {timeout} seconds")
                         process.terminate()
-                        try:
-                            process.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
                         break
 
-                    # Collect memory stats
-                    for pid in list(self.events.keys()):
-                        try:
-                            mem_info = self._get_process_memory(pid)
-                            if mem_info and isinstance(mem_info.get('rss', 0), (int, float)):
-                                self.memory_stats[pid].append({
-                                    'timestamp': current_time,
-                                    'memory': mem_info
-                                })
-                        except Exception as e:
-                            logger.debug(f"Error collecting memory stats for PID {pid}: {str(e)}")
-                            continue
+                    # Check process output
+                    stdout_data = process.stdout.readline()
+                    if stdout_data:
+                        logger.debug(f"Process output: {stdout_data.strip()}")
 
-                    time.sleep(0.1)
+                    time.sleep(0.1)  # Prevent CPU overload
 
                 except KeyboardInterrupt:
-                    logger.info("\nReceived interrupt, cleaning up...")
-                    process.terminate()
+                    logger.info("\nReceived interrupt signal")
                     break
 
-            # Generate and return trace data
-            return self._generate_trace_data(command[1])  # Pass script path
+            logger.info("Event polling loop completed")
+
+            # Check process status
+            exit_code = process.poll()
+            logger.info(f"Process exited with code: {exit_code}")
+
+            # Generate trace data
+            trace_data = self._generate_trace_data(command[1])
+
+            # Save the trace data
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
+
+            with open(output_file, "w") as f:
+                json.dump(trace_data, f, indent=2)
+
+            logger.info(f"\nTrace completed. Results saved to {output_file}")
+
+            return trace_data
 
         except Exception as e:
             logger.error(f"Error during tracing: {str(e)}")
             raise
         finally:
             try:
-                if 'process' in locals():
-                    process.terminate()
+                if hasattr(self, 'process') and self.process:
+                    self.process.terminate()
             except Exception:
                 pass
             self._cleanup()
@@ -420,19 +462,20 @@ class PythonTracer:
             logger.error(f"Error during cleanup: {str(e)}")
 
     def _generate_trace_data(self, python_script):
+        """Generate the final trace data structure."""
         trace_data = {
             "metadata": {
                 "script": python_script,
                 "duration": time.time() - self.start_time,
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             },
-            "processes": {}
+            "processes": {},
+            "phases": dict(self.phases),
+            "file_patterns": {k: list(set(v)) for k, v in self.file_patterns.items()}
         }
 
         for pid, events in self.events.items():
             memory_data = self.memory_stats.get(int(pid), [])
-
-            # Calculate statistics
             syscall_summary = self._summarize_syscalls(events)
             file_operations = self._summarize_file_operations(events)
 
@@ -672,28 +715,21 @@ def main():
         sys.exit(1)
 
     try:
-        # Create output directory if it doesn't exist
-        current_dir = os.getcwd()
-        output_dir = os.path.join(current_dir, 'traces')
-        os.makedirs(output_dir, exist_ok=True)
-
-        timeout = 120  # 2 minute timeout
-        logger.info("Initializing eBPF tracer...")
-        tracer = PythonTracer()
-
-        # Get script path and verify it exists
-        script_name = sys.argv[1]
-        script_path = os.path.abspath(script_name)
-        script_args = sys.argv[2:] if len(sys.argv) > 2 else []
-
+        script_path = os.path.abspath(sys.argv[1])
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Script not found: {script_path}")
 
-        # Run the script with Python interpreter
-        command = ["/usr/bin/python3", script_path] + script_args
-        command_str = " ".join(command)
-        logger.info(f"Starting trace of {script_path}... (timeout: {timeout}s)")
-        trace_data = tracer.run_trace(command, timeout=timeout)
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(os.path.dirname(script_path), 'traces')
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Set up the command with any additional arguments
+        command = [sys.executable, script_path] + sys.argv[2:]
+        logger.info(f"Starting trace of {script_path}...")
+
+        # Create and run tracer
+        tracer = PythonTracer()
+        trace_data = tracer.run_trace(command)  # Using default timeout of 120s
 
         # Add behavior analysis
         analyzer = ModelBehaviorAnalyzer(trace_data)
@@ -710,8 +746,7 @@ def main():
         logger.info("\nSummary:")
         logger.info("--------")
 
-        # Try to get model path from loader's output files
-        model_path = None
+        # Print summary information
         try:
             profile_files = [f for f in os.listdir(output_dir)
                            if f.startswith('profile_') and f.endswith('.json')]
@@ -721,16 +756,15 @@ def main():
                 with open(os.path.join(output_dir, latest_profile)) as f:
                     profile_data = json.load(f)
                     model_path = profile_data.get('metadata', {}).get('model_path')
+                    if model_path:
+                        print(f"Model scanned: {model_path}")
+            else:
+                print("Model path not found in profile data")
         except Exception as e:
             logger.debug(f"Could not read model path from profile: {e}")
-
-        # Print summary information
-        if model_path:
-            print(f"Model scanned: {model_path}")
-        else:
             print("Model path not found in profile data")
-        print()
 
+        # Print process information
         for pid, data in trace_data["processes"].items():
             print(f"PID {pid}:")
             print(f"  Total syscalls: {data['event_count']}")
@@ -740,6 +774,7 @@ def main():
                 print(f"    - {category}: {count}")
             print(f"  File operations: {len(data['file_operations'])}")
 
+        # Print behavior analysis
         print("\nBehavior Analysis:")
         print("----------------")
         print("Execution Phases:")
