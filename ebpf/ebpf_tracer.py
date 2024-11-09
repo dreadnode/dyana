@@ -273,17 +273,14 @@ class PythonTracer:
 
             # Track file operations
             if filename and category == 'file_ops':
-                # Initialize file_operations if not exists
-                #if not hasattr(self, 'file_operations'):
-                #    self.file_operations = defaultdict(list)
-
-                ## Store file operation
+                logger.debug(f"Processing file operation: {filename} for PID {event.pid}")
                 self.file_operations[event.pid].append({
                     'timestamp': event.timestamp,
                     'operation': syscall_name,
                     'filename': filename,
                     'result': event.ret
                 })
+                logger.debug(f"Current file_operations count for PID {event.pid}: {len(self.file_operations[event.pid])}")
 
                 ## Initialize file_patterns if not exists
                 #if not hasattr(self, 'file_patterns'):
@@ -308,19 +305,21 @@ class PythonTracer:
                     self.file_patterns['weights'].append(filename)
 
             # Track execution phases
-            if "=== " in comm and " PHASE " in comm:
-                phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower()
-                # Initialize phases if not exists
-                if not hasattr(self, 'phases'):
-                    self.phases = defaultdict(list)
+            if "PHASE" in comm:  # More lenient phase detection
+                try:
+                    phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower() if "===" in comm else \
+                                comm.split("PHASE")[0].strip().lower()
+                    logger.debug(f"Detected potential phase in comm: {comm}")
 
-                self.phases[phase_name].append({
-                    'start': event.timestamp,
-                    'end': event.timestamp + 1000000,  # Add 1ms duration
-                    'pid': event.pid,
-                    'event': event_dict
-                })
-                logger.debug(f"Detected phase: {phase_name}")
+                    self.phases[phase_name].append({
+                        'start': event.timestamp,
+                        'end': event.timestamp + 1000000,  # Add 1ms duration
+                        'pid': event.pid,
+                        'event': event_dict
+                    })
+                    logger.debug(f"Added phase: {phase_name}")
+                except Exception as e:
+                    logger.debug(f"Failed to parse phase from comm: {comm}, error: {e}")
 
             # Debug logging
             logger.debug(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
