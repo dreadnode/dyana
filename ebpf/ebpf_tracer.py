@@ -200,12 +200,11 @@ class PythonTracer:
     def __init__(self):
         """Initialize the Python tracer."""
         try:
-            self.bpf = BPF(text=bpf_text, debug=0)
+            # Initialize data structures with default values
             self.events = defaultdict(list)
             self.memory_stats = defaultdict(list)
-            self.start_time = time.time()
-            # Initialize tracking structures
             self.file_operations = defaultdict(list)
+            self.phases = defaultdict(list)
             self.file_patterns = {
                 'model_files': [],
                 'configs': [],
@@ -213,92 +212,154 @@ class PythonTracer:
                 'libraries': [],
                 'weights': []
             }
-            self.phases = defaultdict(list)
-            logger.info("BPF program loaded successfully")
+            self.start_time = time.time()
+            self.process = None
+            self.trace_data = None
+            self.bpf = None
+
+            # Set up signal handlers
+            signal.signal(signal.SIGINT, self.signal_handler)
+            signal.signal(signal.SIGTERM, self.signal_handler)
+
+            # Initialize BPF
+            if not os.path.exists("/sys/kernel/debug"):
+                logger.warning("debugfs not mounted. Attempting to mount...")
+                os.system("mount -t debugfs debugfs /sys/kernel/debug")
+
+            # Load BPF program
+            try:
+                self.bpf = BPF(text=bpf_text)
+                logger.info("BPF program loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load BPF program: {e}")
+                raise
+
+            # Initialize syscall tracking
+            self.syscall_stats = defaultdict(lambda: {
+                'count': 0,
+                'errors': 0,
+                'total_time': 0
+            })
+
+            # Initialize phase tracking
+            self.current_phase = None
+            self.phase_start_time = None
+            self.phase_events = defaultdict(list)
+
+            # Initialize file tracking
+            self.open_files = {}
+            self.file_stats = defaultdict(lambda: {
+                'reads': 0,
+                'writes': 0,
+                'total_bytes': 0
+            })
+
+            # Initialize process tracking
+            self.child_processes = set()
+            self.process_stats = defaultdict(lambda: {
+                'start_time': None,
+                'end_time': None,
+                'syscalls': 0,
+                'file_ops': 0
+            })
+
         except Exception as e:
-            logger.error(f"Failed to initialize BPF: {str(e)}")
+            logger.error(f"Failed to initialize tracer: {e}")
+            self._cleanup()
             raise
 
     def signal_handler(self, signum, frame):
         """Handle interrupt signals."""
         logger.info("\nReceived interrupt signal, cleaning up...")
-        if hasattr(self, 'process') and self.process:
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except Exception:
-                try:
-                    self.process.kill()
-                except Exception:
-                    pass
-
-        # Save any collected data
         try:
-            if hasattr(self, 'trace_data') and self.trace_data:
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                output_dir = os.path.join(os.getcwd(), 'traces')
-                os.makedirs(output_dir, exist_ok=True)
-                output_file = os.path.join(output_dir, f"trace_results_interrupted_{timestamp}.json")
-                with open(output_file, "w") as f:
-                    json.dump(self.trace_data, indent=2, fp=f)
-                logger.info(f"Saved partial trace data to {output_file}")
-        except Exception as e:
-            logger.error(f"Failed to save trace data during cleanup: {e}")
+            # Close ring buffer first
+            if hasattr(self, 'bpf') and self.bpf:
+                try:
+                    self.bpf["syscall_events"].close_ring_buffer()
+                except Exception as e:
+                    logger.debug(f"Error closing ring buffer: {e}")
 
-        self._cleanup()
-        sys.exit(0)
+            # Save data
+            if hasattr(self, 'events') and self.events:
+                try:
+                    trace_data = self._generate_trace_data("interrupted_trace")
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    output_dir = os.path.join(os.getcwd(), 'traces')
+                    os.makedirs(output_dir, exist_ok=True)
+                    output_file = os.path.join(output_dir, f"trace_results_interrupted_{timestamp}.json")
+                    with open(output_file, "w") as f:
+                        json.dump(trace_data, indent=2, fp=f)
+                    logger.info(f"Saved partial trace data to {output_file}")
+                except Exception as e:
+                    logger.error(f"Failed to save trace data during cleanup: {e}")
+
+            if hasattr(self, 'bpf') and self.bpf:
+                try:
+                    self.bpf.cleanup()
+                except Exception as e:
+                    logger.debug(f"Error during BPF cleanup: {e}")
+
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+        finally:
+            os._exit(0)
 
     def _process_event(self, cpu, data, size):
-        """Process each syscall event from the ring buffer."""
+        """Process a BPF event."""
         try:
+            if not data:
+                return
+
             event = self.bpf["syscall_events"].event(data)
-            syscall_name = SYSCALLS.get(event.syscall_id, f"syscall_{event.syscall_id}")
-            category = SYSCALL_TO_CATEGORY.get(event.syscall_id, "unknown")
+            if not event:
+                return
 
-            # Decode filename if present
-            filename = event.filename.decode('utf-8', errors='replace') if event.filename else None
+            # Get basic event info with safe defaults
+            pid = getattr(event, 'pid', 0)
+            timestamp = float(getattr(event, 'timestamp', 0))
+            syscall_id = getattr(event, 'syscall_id', -1)
+            syscall_name = SYSCALLS.get(syscall_id, "unknown")
+            category = SYSCALL_TO_CATEGORY.get(syscall_id, "unknown")
 
-            # Decode command
-            comm = event.comm.decode('utf-8', errors='replace')
+            # Add debug logging
+            logger.debug(f"Processing event: pid={pid}, syscall={syscall_id}")
 
+            # Create event dictionary with safe values
             event_dict = {
-                "timestamp": event.timestamp,
-                "pid": event.pid,
-                "tid": event.tid,
-                "comm": comm,
-                "syscall_id": event.syscall_id,
-                "syscall_name": syscall_name,
-                "syscall_category": category,
-                "args": [event.arg0, event.arg1, event.arg2],
-                "return_value": event.ret,
-                "filename": filename
+                'timestamp': timestamp,
+                'syscall_id': syscall_id,
+                'syscall_name': syscall_name,
+                'syscall_category': category,
+                'ret': getattr(event, 'ret', 0),
+                'comm': getattr(event, 'comm', b'').decode('utf-8', 'replace'),
+                'arg0': getattr(event, 'arg0', 0),
+                'arg1': getattr(event, 'arg1', 0),
+                'arg2': getattr(event, 'arg2', 0)
             }
 
+            # Safely get filename if it exists
+            try:
+                filename = getattr(event, 'filename', b'').decode('utf-8', 'replace')
+                if filename:
+                    event_dict['filename'] = filename
+            except Exception:
+                filename = None
+
             # Store the event
-            self.events[event.pid].append(event_dict)
+            if pid:
+                self.events[pid].append(event_dict)
 
             # Track file operations
             if filename and category == 'file_ops':
-                logger.debug(f"Processing file operation: {filename} for PID {event.pid}")
-                self.file_operations[event.pid].append({
-                    'timestamp': event.timestamp,
-                    'operation': syscall_name,
-                    'filename': filename,
-                    'result': event.ret
-                })
-                logger.debug(f"Current file_operations count for PID {event.pid}: {len(self.file_operations[event.pid])}")
+                if pid:
+                    self.file_operations[pid].append({
+                        'timestamp': timestamp,
+                        'operation': syscall_name,
+                        'filename': filename,
+                        'result': getattr(event, 'ret', 0)
+                    })
 
-                ## Initialize file_patterns if not exists
-                #if not hasattr(self, 'file_patterns'):
-                #    self.file_patterns = {
-                #        'model_files': [],
-                #        'configs': [],
-                #        'temp_files': [],
-                #        'libraries': [],
-                #        'weights': []
-                #    }
-
-                # Categorize file access patterns - for real-time tracking of unique files
+                # Categorize file access patterns
                 if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
                     self.file_patterns['model_files'].append(filename)
                 elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
@@ -310,28 +371,22 @@ class PythonTracer:
                 elif '.weight' in filename or '.bias' in filename:
                     self.file_patterns['weights'].append(filename)
 
-            # Track execution phases
-            if "PHASE" in comm:  # More lenient phase detection
-                logger.debug(f"Processing comm string: {comm}")
+            # Track execution phases safely
+            comm = event_dict['comm']
+            if "PHASE" in comm:
                 try:
                     phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower() if "===" in comm else \
                                 comm.split("PHASE")[0].strip().lower()
-                    logger.debug(f"Detected potential phase in comm: {comm}")
 
-                    self.phases[phase_name].append({
-                        'start': event.timestamp,
-                        'end': event.timestamp + 1000000,  # Add 1ms duration
-                        'pid': event.pid,
-                        'event': event_dict
-                    })
-                    logger.debug(f"Added phase: {phase_name}")
+                    if pid:
+                        self.phases[phase_name].append({
+                            'start': timestamp,
+                            'end': timestamp + 1000000,  # Add 1ms duration
+                            'pid': pid,
+                            'event': event_dict
+                        })
                 except Exception as e:
                     logger.debug(f"Failed to parse phase from comm: {comm}, error: {e}")
-
-            # Debug logging
-            logger.debug(f"PID {event.pid} [{category}]: {syscall_name}({event.arg0}, {event.arg1}, {event.arg2}) = {event.ret}")
-            if filename:
-                logger.debug(f"  filename: {filename}")
 
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
@@ -356,20 +411,32 @@ class PythonTracer:
 
     def run_trace(self, command, timeout=120):
         """Run the trace on a Python script."""
+        output_file = None
         try:
-            # Split command if it's a string
-            if isinstance(command, str):
-                command = command.split()
+            # Store command for later use
+            self.command = command if isinstance(command, list) else command.split()
+            self.start_time = time.time()
 
-            script_name = os.path.basename(command[1])
+            script_name = os.path.basename(self.command[1])
             logger.info(f"Starting trace of {script_name}... (timeout: {timeout}s)")
             logger.info(f"Starting trace of script: {script_name}")
 
-            # Initialize data structures
-            # self.events = defaultdict(list)
-            # self.memory_stats = defaultdict(list)
-            # self.file_patterns = defaultdict(list)
-            # self.phases = defaultdict(list)
+            # Create output directory with explicit permissions
+            self.output_dir = os.path.join(os.getcwd(), 'traces')
+            os.makedirs(self.output_dir, mode=0o777, exist_ok=True)
+
+            # Generate output filename early
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            output_file = os.path.join(self.output_dir, f"trace_results_{timestamp}.json")
+
+            # Test file writing permission early
+            try:
+                with open(output_file, 'w') as f:
+                    f.write("{}\n")
+                logger.info(f"Successfully verified write access to {output_file}")
+            except Exception as e:
+                logger.error(f"Failed to write to output file: {e}")
+                raise
 
             # Start tracing
             self.bpf["syscall_events"].open_ring_buffer(self._process_event)
@@ -379,6 +446,8 @@ class PythonTracer:
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                bufsize=1,  # Line buffered
+                universal_newlines=True,  # Text mode
                 cwd=os.path.dirname(command[1])
             )
 
@@ -390,74 +459,131 @@ class PythonTracer:
 
             # Monitor the process
             start_time = time.time()
+            last_activity_time = start_time
+            last_progress_time = start_time
+            stdout_queue = []
             logger.info("Starting event polling loop...")
 
+            event_count = 0
             while process.poll() is None:
                 try:
-                    # Poll for events
-                    logger.debug("Polling for events...")
+                    # Poll for BPF events
                     events = self.bpf.ring_buffer_poll()
-                    logger.debug(f"Received {events} events")
 
-                    # Check memory usage
+                    # Track activity and time
+                    current_time = time.time()
+
+                    # Add debug logging for events
+                    if events:
+                        event_count += events
+                        logger.debug(f"Processed {events} events (total: {event_count})")
+                        last_activity_time = current_time
+
+                    elapsed_time = current_time - start_time
+                    inactivity_time = current_time - last_activity_time
+
+                    # Check for timeout or inactivity
+                    if elapsed_time > timeout:
+                        logger.warning(f"Trace timed out after {timeout} seconds")
+                        break
+                    elif inactivity_time > 10:  # 10 seconds of inactivity
+                        logger.info("No events for 10 seconds, checking process status...")
+                        if not process.stdout.readable():
+                            logger.info("Process output stream closed, ending trace")
+                            break
+                        last_activity_time = current_time
+
+                    # Track memory usage safely
                     try:
                         proc = psutil.Process(process.pid)
-                        with proc.oneshot():
-                            memory_info = proc.memory_full_info()
-                            self.memory_stats[process.pid].append({
-                                'timestamp': time.time(),
+                        memory_info = proc.memory_info()
+                        if memory_info:
+                            memory_stats = {
+                                'timestamp': current_time,
                                 'memory': {
-                                    'rss': memory_info.rss / 1024,
-                                    'vms': memory_info.vms / 1024,
-                                    'shared': memory_info.shared / 1024
+                                    'rss': getattr(memory_info, 'rss', 0) / 1024,
+                                    'vms': getattr(memory_info, 'vms', 0) / 1024,
+                                    'shared': getattr(memory_info, 'shared', 0) / 1024
                                 }
-                            })
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        logger.debug("Process no longer exists or access denied")
-                        break
+                            }
+                            self.memory_stats[process.pid].append(memory_stats)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError) as e:
+                        logger.debug(f"Could not get memory info: {e}")
 
-                    # Check timeout
-                    elapsed = time.time() - start_time
-                    if elapsed > timeout:
-                        logger.warning(f"Trace timed out after {timeout} seconds")
-                        process.terminate()
-                        break
+                    # Print progress only if enough time has passed
+                    if current_time - last_progress_time >= 5:
+                        logger.info(f"Tracing in progress... ({int(elapsed_time)}s elapsed)")
+                        last_progress_time = current_time
 
-                    # Check process output
-                    stdout_data = process.stdout.readline()
-                    if stdout_data:
-                        logger.debug(f"Process output: {stdout_data.strip()}")
+                    # Check process output with buffering
+                    while True:
+                        output = process.stdout.readline()
+                        if not output:
+                            break
+                        stdout_queue.append(output.strip())
+                        if len(stdout_queue) >= 10:
+                            logger.info("Process output:\n" + "\n".join(stdout_queue))
+                            stdout_queue = []
+
+                    # Check stderr for any errors
+                    stderr_output = process.stderr.readline()
+                    if stderr_output:
+                        logger.warning(f"Process stderr: {stderr_output.strip()}")
 
                     time.sleep(0.1)  # Prevent CPU overload
 
-                except KeyboardInterrupt:
-                    logger.info("\nReceived interrupt signal")
-                    break
+                except Exception as e:
+                    logger.error(f"Error in polling loop: {str(e)}")
+                    logger.debug("Error details:", exc_info=True)
+                    continue
 
-            logger.info("Event polling loop completed")
+            # Flush any remaining output
+            if stdout_queue:
+                logger.info("Process output:\n" + "\n".join(stdout_queue))
 
-            # Check process status
+            # Get process exit code
             exit_code = process.poll()
             logger.info(f"Process exited with code: {exit_code}")
 
-            # Generate trace data
-            trace_data = self._generate_trace_data(command[1])
+            # Generate and save trace data with explicit error handling
+            try:
+                logger.info("Event polling loop completed")
+                trace_data = self._generate_trace_data(command[1])
 
-            # Save results
-            # timestamp = time.strftime("%Y%m%d_%H%M%S")
-            # output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
-            # os.makedirs(output_dir, exist_ok=True)
-            # output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
+                # Add behavior analysis
+                analyzer = ModelBehaviorAnalyzer(trace_data)
+                behavior_profile = analyzer.analyze()
+                trace_data['behavior_profile'] = behavior_profile
 
-            # with open(output_file, "w") as f:
-            #     json.dump(trace_data, f, indent=2)
+                with open(output_file, "w") as f:
+                    json.dump(trace_data, indent=2, fp=f)
+                logger.info(f"Trace data saved to {output_file}")
 
-            # logger.info(f"\nTrace completed. Results saved to {output_file}")
+                # Verify the file was written
+                if os.path.exists(output_file):
+                    file_size = os.path.getsize(output_file)
+                    logger.info(f"Verified file creation: {output_file} ({file_size} bytes)")
+                else:
+                    logger.error(f"File was not created: {output_file}")
 
-            return trace_data
+                return trace_data
+
+            except Exception as e:
+                logger.error(f"Failed to save trace data: {e}")
+                raise
 
         except Exception as e:
             logger.error(f"Error during tracing: {str(e)}")
+            # Try to save partial data if we have an output file
+            if output_file and hasattr(self, 'events'):
+                try:
+                    partial_data = self._generate_trace_data(command[1])
+                    partial_file = output_file.replace('.json', '_partial.json')
+                    with open(partial_file, "w") as f:
+                        json.dump(partial_data, indent=2, fp=f)
+                    logger.info(f"Saved partial trace data to {partial_file}")
+                except Exception as save_error:
+                    logger.error(f"Failed to save partial data: {save_error}")
             raise
         finally:
             try:
@@ -474,46 +600,62 @@ class PythonTracer:
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
 
-    def _generate_trace_data(self, python_script):
+    def _generate_trace_data(self, script_path):
         """Generate the final trace data structure."""
-        logger.debug(f"Generating trace data for {python_script}")
-        logger.debug(f"File operations tracked: {dict(self.file_operations)}")
+        logger.debug(f"Generating trace data for {script_path}")
 
         trace_data = {
             "metadata": {
-                "script": python_script,
+                "script": script_path,
                 "duration": time.time() - self.start_time,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "command": " ".join(self.command) if hasattr(self, 'command') else str(script_path)
             },
             "processes": {},
-            "phases": dict(self.phases),  # Convert defaultdict to regular dict
-            "file_patterns": {k: list(set(v)) for k, v in self.file_patterns.items()}  # Deduplicate files
+            "phases": dict(self.phases),
+            "file_patterns": {k: list(set(v)) for k, v in self.file_patterns.items()}
         }
 
         # Process data for each PID
         for pid in set(pid for pid_list in [self.events.keys(), self.file_operations.keys()] for pid in pid_list):
-            logger.debug(f"Processing PID {pid}")
-            logger.debug(f"Events count: {len(self.events.get(pid, []))}")
-            logger.debug(f"File operations count: {len(self.file_operations.get(pid, []))}")
-
+            pid_str = str(pid)  # Convert pid to string for JSON compatibility
             events = self.events.get(pid, [])
             file_ops = self.file_operations.get(pid, [])
-            memory_data = self.memory_stats.get(int(pid), [])
+            memory_data = self.memory_stats.get(pid, [])
 
-            trace_data["processes"][str(pid)] = {
+            trace_data["processes"][pid_str] = {
                 "events": events,
                 "event_count": len(events),
-                "syscall_summary": self._summarize_syscalls(events),
+                "syscall_summary": {
+                    "by_category": self._summarize_syscalls_by_category(events),
+                    "by_name": self._summarize_syscalls_by_name(events)
+                },
                 "file_operations": file_ops,
                 "memory_profile": memory_data,
                 "peak_memory": {
-                    'rss': max([m['memory']['rss'] for m in memory_data], default=0),
-                    'vms': max([m['memory']['vms'] for m in memory_data], default=0),
-                    'shared': max([m['memory']['shared'] for m in memory_data], default=0)
+                    'rss': max((m.get('memory', {}).get('rss', 0) for m in memory_data), default=0),
+                    'vms': max((m.get('memory', {}).get('vms', 0) for m in memory_data), default=0),
+                    'shared': max((m.get('memory', {}).get('shared', 0) for m in memory_data), default=0)
                 }
             }
 
         return trace_data
+
+    def _summarize_syscalls_by_category(self, events):
+        """Summarize syscalls by category."""
+        categories = defaultdict(int)
+        for event in events:
+            category = event.get('syscall_category', 'unknown')
+            categories[category] += 1
+        return dict(categories)
+
+    def _summarize_syscalls_by_name(self, events):
+        """Summarize syscalls by name."""
+        syscalls = defaultdict(int)
+        for event in events:
+            name = event.get('syscall_name', 'unknown')
+            syscalls[name] += 1
+        return dict(syscalls)
 
     def _summarize_syscalls(self, events):
         syscall_counts = defaultdict(int)
@@ -565,9 +707,13 @@ class ModelBehaviorAnalyzer:
         }
 
     def analyze(self):
-        for pid, process_data in self.trace_data['processes'].items():
-            events = process_data['events']
-            self._identify_phases(events)
+        """Analyze the trace data."""
+        try:
+            for pid, process_data in self.trace_data.get('processes', {}).items():
+                events = process_data.get('events', [])
+                self._identify_phases(events)
+        except Exception as e:
+            logger.error(f"Error during analysis: {e}")
 
         return {
             'phases': self.phases,
@@ -604,7 +750,7 @@ class ModelBehaviorAnalyzer:
     def _is_cleanup(self, event):
         return (event['syscall_category'] == 'file_ops' and
                 event['syscall_name'] in ['close', 'munmap'] and
-                event['args'][0] > 0)
+                event.get('arg0', 0) > 0)
 
     def _mark_phase_transition(self, from_phase, to_phase, start_time, end_time):
         self.phases[from_phase].append({
@@ -661,30 +807,36 @@ class ModelBehaviorAnalyzer:
 
         for pid, process_data in self.trace_data['processes'].items():
             try:
-                peak_rss = process_data.get('peak_memory', {}).get('rss', 0)
-                if peak_rss:  # Only update if we have a valid peak_rss
+                # Safely get peak memory values with defaults
+                peak_memory = process_data.get('peak_memory', {})
+                peak_rss = peak_memory.get('rss', 0) if peak_memory else 0
+
+                # Update peak usage only if we have valid data
+                if isinstance(peak_rss, (int, float)) and peak_rss > 0:
                     memory_profile['peak_usage'] = max(memory_profile['peak_usage'], peak_rss)
 
                 # Track memory allocation patterns
                 allocs = defaultdict(int)
                 for event in process_data.get('events', []):
                     if event.get('syscall_name') == 'mmap':
-                        args = event.get('args', [0, 0, 0])
-                        if len(args) > 1 and args[1]:
+                        args = event.get('args', [])
+                        if len(args) > 1 and isinstance(args[1], (int, float)):
                             allocs['allocated'] += args[1]
                     elif event.get('syscall_name') == 'munmap':
-                        args = event.get('args', [0, 0, 0])
-                        if len(args) > 1 and args[1]:
+                        args = event.get('args', [])
+                        if len(args) > 1 and isinstance(args[1], (int, float)):
                             allocs['freed'] += args[1]
 
-                # Check for potential leaks
-                if allocs['allocated'] - allocs['freed'] > 1024 * 1024:  # more than 1MB difference
-                    memory_profile['potential_leaks'].append({
-                        'pid': pid,
-                        'allocated': allocs['allocated'],
-                        'freed': allocs['freed'],
-                        'difference': allocs['allocated'] - allocs['freed']
-                    })
+                # Check for potential leaks (only if we have valid allocation data)
+                if allocs['allocated'] > 0 and allocs['freed'] > 0:
+                    diff = allocs['allocated'] - allocs['freed']
+                    if diff > 1024 * 1024:  # more than 1MB difference
+                        memory_profile['potential_leaks'].append({
+                            'pid': pid,
+                            'allocated': allocs['allocated'],
+                            'freed': allocs['freed'],
+                            'difference': diff
+                        })
             except Exception as e:
                 logger.debug(f"Error analyzing memory for PID {pid}: {str(e)}")
                 continue
@@ -750,7 +902,7 @@ def main():
         sys.exit(1)
 
     try:
-        # Fix command parsing
+        # Parse command line arguments
         if "--" in sys.argv:
             separator_index = sys.argv.index("--")
             target_script = sys.argv[separator_index + 1]
@@ -763,17 +915,30 @@ def main():
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Script not found: {script_path}")
 
-        # Create output directory if it doesn't exist
-        output_dir = os.path.join(os.path.dirname(script_path), 'traces')
-        os.makedirs(output_dir, exist_ok=True)
+        # Create output directory
+        output_dir = os.path.join(os.getcwd(), 'traces')
+        os.makedirs(output_dir, mode=0o777, exist_ok=True)
 
-        # Set up the command with any additional arguments
+        # Generate output filename early
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
+
+        # Test file writing permission early
+        try:
+            with open(output_file, 'w') as f:
+                f.write("{}\n")
+            logger.info(f"Successfully verified write access to {output_file}")
+        except Exception as e:
+            logger.error(f"Failed to write to output file: {e}")
+            raise
+
+        # Set up the command
         command = [sys.executable, script_path] + script_args
         logger.info(f"Starting trace of {' '.join(command)}...")
 
         # Create and run tracer
         tracer = PythonTracer()
-        trace_data = tracer.run_trace(command)  # Using default timeout of 120s
+        trace_data = tracer.run_trace(command)
 
         # Add behavior analysis
         analyzer = ModelBehaviorAnalyzer(trace_data)
@@ -781,10 +946,9 @@ def main():
         trace_data['behavior_profile'] = behavior_profile
 
         # Save results with timestamp
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
         with open(output_file, "w") as f:
             json.dump(trace_data, indent=2, fp=f)
+            logger.info(f"Results saved to {output_file}")
 
         logger.info(f"\nTrace completed. Results saved to {output_file}")
         logger.info("\nSummary:")
