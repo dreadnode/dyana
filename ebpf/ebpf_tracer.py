@@ -745,11 +745,20 @@ class ModelBehaviorAnalyzer:
 
 def main():
     if len(sys.argv) < 2:
-        logger.error("Usage: %s <python_script>" % sys.argv[0])
+        logger.error("Usage: %s <python_script> [args...]" % sys.argv[0])
         sys.exit(1)
 
     try:
-        script_path = os.path.abspath(sys.argv[1])
+        # Fix command parsing
+        if "--" in sys.argv:
+            separator_index = sys.argv.index("--")
+            target_script = sys.argv[separator_index + 1]
+            script_args = sys.argv[separator_index + 2:]
+        else:
+            target_script = sys.argv[1]
+            script_args = sys.argv[2:]
+
+        script_path = os.path.abspath(target_script)
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Script not found: {script_path}")
 
@@ -758,8 +767,8 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
 
         # Set up the command with any additional arguments
-        command = [sys.executable, script_path] + sys.argv[2:]
-        logger.info(f"Starting trace of {script_path}...")
+        command = [sys.executable, script_path] + script_args
+        logger.info(f"Starting trace of {' '.join(command)}...")
 
         # Create and run tracer
         tracer = PythonTracer()
@@ -770,7 +779,7 @@ def main():
         behavior_profile = analyzer.analyze()
         trace_data['behavior_profile'] = behavior_profile
 
-        # Save results
+        # Save results with timestamp
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
         with open(output_file, "w") as f:
@@ -828,6 +837,18 @@ def main():
         for category, files in tracer.file_patterns.items():
             if files:
                 print(f"  {category.replace('_', ' ').title()}: {len(files)} files")
+
+        # Print detailed file statistics
+        print("\nFile Operation Statistics:")
+        print("-----------------------")
+        for pid, data in trace_data["processes"].items():
+            if 'file_operations' in data:
+                print(f"\nPID {pid} File Operations:")
+                op_counts = defaultdict(int)
+                for op in data['file_operations']:
+                    op_counts[op['operation']] += 1
+                for op, count in op_counts.items():
+                    print(f"  {op}: {count}")
 
     except Exception as e:
         print(f"Error: {str(e)}")
