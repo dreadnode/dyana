@@ -34,12 +34,12 @@ chmod 777 /root/ebpf/traces
 RUN pip3 install --break-system-packages psutil transformers torch
 
 # Copy our files
-COPY ebpf_tracer.py loader.py /root/
+COPY ebpf_tracer.py ebpf_bert_tiny_loader.py ebpf_loader_dynamic.py /root/
 
 WORKDIR /root
 
 # Make scripts executable
-RUN chmod +x /root/ebpf_tracer.py /root/loader.py
+RUN chmod +x /root/ebpf_tracer.py /root/ebpf_bert_tiny_loader.py /root/ebpf_loader_dynamic.py
 WORKDIR /root/ebpf
 
 # Mount debugfs and start shell
