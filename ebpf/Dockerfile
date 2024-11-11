@@ -8,6 +8,8 @@ COPY --from=ksrc /kernel-dev.tar /
 RUN tar xf kernel-dev.tar && rm kernel-dev.tar
 
 # Install required packages
+# Completely remove and recreate the directory structure and setup kernel headers for BPF compilation
+# Note: We're linking the 5.10.25 headers to where BCC looks for the running kernel's headers
 RUN apt-get update && apt-get install -y \
     kmod \
     python3-bpfcc \
