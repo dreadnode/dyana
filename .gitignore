@@ -168,3 +168,4 @@ cython_debug/
 # ebpf development
 ebpf/ebpf-docker-for-mac/
 ebpf/traces/
+*DS_Store
