@@ -164,7 +164,8 @@ RAW_TRACEPOINT_PROBE(sys_enter) {
     // Special handling for file-related syscalls
     if (event.syscall_id == 257 || // openat
         event.syscall_id == 256 || // open
-        event.syscall_id == 322) { // execve
+        event.syscall_id == 322 || // execve
+        event.syscall_id == 437) { // openat2
         bpf_probe_read_user_str(event.filename, sizeof(event.filename), (void *)event.arg1);
     }
 
