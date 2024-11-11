@@ -9,6 +9,7 @@ This tool uses eBPF to trace and profile the runtime behavior of ML model loadin
   - [Verifying Setup](#verifying-setup)
   - [Troubleshooting](#troubleshooting)
     - [Finding the Right Kernel Version](#finding-the-right-kernel-version)
+    - [Run just the `loader.py`:](#run-just-the-loaderpy)
   - [Inspiration \& Credits](#inspiration--credits)
   - [Notes](#notes)
     - [Other useful debugging:](#other-useful-debugging)
@@ -21,6 +22,26 @@ The tracer generates JSON data containing:
 - Process information
 - Execution duration
 - File operations
+
+- `-PythonTracer` class with all essential methods:
+    - `__init__`
+    - `_analyze_file_patterns`
+    - `_process_event`
+    - `_get_process_memory`
+    - `run_trace` (needs to be added)
+- `ModelBehaviorAnalyzer` class with all analysis methods:
+    - `__init__`
+    - `analyze`
+    - `_identify_phases`
+    - `_is_cleanup`
+    - `_mark_phase_transition`
+    - `_is_model_loading`
+    - `_is_inference`
+    - `_analyze_security`
+    - `_analyze_resources`
+    - `_analyze_memory_usage`
+    - `_analyze_file_usage`
+    - `_get_file_access_patterns`
 
 ## Prerequisites
 
@@ -38,9 +59,10 @@ docker run -it --rm \
     --cap-add=SYS_RESOURCE \
     --cap-add=SYS_PTRACE \
     -v /sys/kernel/debug:/sys/kernel/debug \
+    -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "python3 /root/ebpf_tracer.py /root/loader.py"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug" # ie loading bert_tiny from tokenizers
 ```
 
 Or, if you prefer step by step:
@@ -63,10 +85,15 @@ docker run -it --rm \
     ebpf-tracer
 ```
 
-2.5. Run the tracer with a mount current directory to /root/ebpf in container if making local development changes to [the tracer](./ebpf_tracer.py)
+Inside the container, run the tracer:
+
+        python3 ebpf_tracer.py "ebpf_bert_tiny_loader.py --debug"  # Uses default test model
+        python3 ebpf_tracer.py "ebpf_loader_dynamic.py --debug --path /root/model" # specify and dynamically load a model
+
+3. Run the tracer with a mount current directory to `/root/ebpf` in container if for example when making local development changes to [the tracer](./ebpf_tracer.py) and using a default small model
 
 ```shell
-➜  ebpf git:(ebpf/tracer-init) ✗ docker run -it --rm \
+docker run -it --rm \
     --privileged \
     --cap-add=SYS_ADMIN \
     --cap-add=SYS_RESOURCE \
@@ -75,13 +102,25 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "python3 /root/ebpf/ebpf_tracer.py /root/ebpf/loader.py"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug && ls -la traces/"
 ```
 
-3. Inside the container, run the tracer:
-```bash
-python3 /root/ebpf_tracer.py /root/loader.py
+4. Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model using `-v /path/to/your/model:/root/model \` and the `ebpf_loader_dynamic.py` dynamic loader
+
+```shell
+docker run -it --rm \
+    --privileged \
+    --cap-add=SYS_ADMIN \
+    --cap-add=SYS_RESOURCE \
+    --cap-add=SYS_PTRACE \
+    -v /sys/kernel/debug:/sys/kernel/debug \
+    -v /path/to/your/model:/root/model \
+    -v $(pwd):/root/ebpf \
+    --pid=host \
+    ebpf-tracer \
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --debug && ls -la traces/"
 ```
+
 
 ## Verifying Setup
 
@@ -112,6 +151,31 @@ curl -s "https://registry.hub.docker.com/v2/repositories/docker/for-desktop-kern
 3. Update the Dockerfile's FROM line if needed:
 ```dockerfile
 FROM docker/for-desktop-kernel:<your-version> AS ksrc
+```
+
+### Run just the `loader.py`:
+
+```shell
+➜  ebpf git:(ebpf/ebpf-tracer-enhancements-v2) docker run -it --rm \
+    --privileged \
+    --cap-add=SYS_ADMIN \
+    --cap-add=SYS_RESOURCE \
+    --cap-add=SYS_PTRACE \
+    -v /sys/kernel/debug:/sys/kernel/debug \
+    -v $(pwd):/root/ebpf \
+    --pid=host \
+    ebpf-tracer \
+    sh -c "cd /root/ebpf && python3 loader.py"
+Loading model prajjwal1/bert-tiny...
+config.json: 100%|███████████████████████████████████████████████| 285/285 [00:00<00:00, 1.41MB/s]
+vocab.txt: 100%|███████████████████████████████████████████████| 232k/232k [00:00<00:00, 11.1MB/s]
+pytorch_model.bin: 100%|█████████████████████████████████████| 17.8M/17.8M [00:00<00:00, 70.8MB/s]
+Running inference 1/5...
+Running inference 2/5...
+Running inference 3/5...
+Running inference 4/5...
+Running inference 5/5...
+Model testing completed successfully!
 ```
 
 ## Inspiration & Credits
