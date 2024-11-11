@@ -96,7 +96,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py loader.py"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py loader.py --debug"
 ```
 
 2.5b Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model

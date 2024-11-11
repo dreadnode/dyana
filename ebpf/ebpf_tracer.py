@@ -306,6 +306,7 @@ class PythonTracer:
 
             # Track execution phases
             if "PHASE" in comm:  # More lenient phase detection
+                logger.debug(f"Processing comm string: {comm}")
                 try:
                     phase_name = comm.split("===")[1].split("PHASE")[0].strip().lower() if "===" in comm else \
                                 comm.split("PHASE")[0].strip().lower()
@@ -469,6 +470,9 @@ class PythonTracer:
 
     def _generate_trace_data(self, python_script):
         """Generate the final trace data structure."""
+        logger.debug(f"Generating trace data for {python_script}")
+        logger.debug(f"File operations tracked: {dict(self.file_operations)}")
+
         trace_data = {
             "metadata": {
                 "script": python_script,
@@ -481,15 +485,20 @@ class PythonTracer:
         }
 
         # Process data for each PID
-        for pid, events in self.events.items():
-            file_ops = self._summarize_file_operations(events)
+        for pid in set(pid for pid_list in [self.events.keys(), self.file_operations.keys()] for pid in pid_list):
+            logger.debug(f"Processing PID {pid}")
+            logger.debug(f"Events count: {len(self.events.get(pid, []))}")
+            logger.debug(f"File operations count: {len(self.file_operations.get(pid, []))}")
+
+            events = self.events.get(pid, [])
+            file_ops = self.file_operations.get(pid, [])
             memory_data = self.memory_stats.get(int(pid), [])
 
             trace_data["processes"][str(pid)] = {
                 "events": events,
                 "event_count": len(events),
                 "syscall_summary": self._summarize_syscalls(events),
-                "file_operations": file_ops,  # This is now a list
+                "file_operations": file_ops,
                 "memory_profile": memory_data,
                 "peak_memory": {
                     'rss': max([m['memory']['rss'] for m in memory_data], default=0),

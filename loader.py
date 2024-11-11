@@ -190,6 +190,7 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     try:
+        print("=== INITIALIZATION PHASE START ===")
         # Add debug info about current directory
         current_dir = os.getcwd()
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -201,6 +202,7 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Created/verified output directory: {output_dir}")
 
+        print("=== MODEL SETUP PHASE START ===")
         # Default test model if no path provided
         model_path = args.path
         if not model_path:
@@ -211,6 +213,7 @@ def main():
         profiler_instance = ModelProfiler(model_path)
         logger.info(f"Profiling model at {profiler_instance.model_path}")
 
+        print("=== PROFILING PHASE START ===")
         results = {
             "base_name": profiler_instance.base_name,
             "metadata": profiler_instance.get_model_metadata(),
@@ -218,12 +221,16 @@ def main():
             "model": profiler_instance.profile_model(),
         }
 
+        print("=== OUTPUT PHASE START ===")
         # Default output filename with absolute path
         output_file = args.output
         if not output_file:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             base_name = model_path.split('/')[-1]
             output_file = os.path.join(output_dir, f"profile_{base_name}_{timestamp}.json")
+            logger.debug(f"Output directory path: {output_dir}")
+            logger.debug(f"Output file path: {output_file}")
+            logger.debug(f"Results to save: {results}")
 
         logger.info(f"Attempting to save results to: {output_file}")
         try:
@@ -234,6 +241,7 @@ def main():
             logger.error(f"Failed to save results: {str(e)}")
             raise
 
+        print("=== CLEANUP PHASE START ===")
         logger.info("Profiling completed successfully")
 
     except Exception as e:
