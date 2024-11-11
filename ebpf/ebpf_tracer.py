@@ -437,15 +437,15 @@ class PythonTracer:
             trace_data = self._generate_trace_data(command[1])
 
             # Save results
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
-            os.makedirs(output_dir, exist_ok=True)
-            output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
+            # timestamp = time.strftime("%Y%m%d_%H%M%S")
+            # output_dir = os.path.join(os.path.dirname(command[1]), 'traces')
+            # os.makedirs(output_dir, exist_ok=True)
+            # output_file = os.path.join(output_dir, f"trace_results_{timestamp}.json")
 
-            with open(output_file, "w") as f:
-                json.dump(trace_data, f, indent=2)
+            # with open(output_file, "w") as f:
+            #     json.dump(trace_data, f, indent=2)
 
-            logger.info(f"\nTrace completed. Results saved to {output_file}")
+            # logger.info(f"\nTrace completed. Results saved to {output_file}")
 
             return trace_data
 
