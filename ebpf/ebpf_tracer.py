@@ -943,6 +943,14 @@ class ModelBehaviorAnalyzer:
         return file_access
 
 def main():
+
+    # Add debug logging if requested
+    if "--trace-debug" in sys.argv:
+        logger.setLevel(logging.DEBUG)
+        # Also enable BPF debug logging
+        for handler in logger.handlers:
+            handler.setLevel(logging.DEBUG)
+
     if len(sys.argv) < 2:
         logger.error("Usage: %s <python_script> [args...]" % sys.argv[0])
         sys.exit(1)

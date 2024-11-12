@@ -102,7 +102,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug && ls -la traces/"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug --trace-debug && ls -la traces/"
 ```
 
 4. Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model using `-v /path/to/your/model:/root/model \` and the `ebpf_loader_dynamic.py` dynamic loader
@@ -118,7 +118,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --debug && ls -la traces/"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --debug --trace-debug && ls -la traces/"
 ```
 
 
@@ -165,7 +165,7 @@ FROM docker/for-desktop-kernel:<your-version> AS ksrc
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 loader.py"
+    sh -c "cd /root/ebpf && python3 loader.py --trace-debug"
 Loading model prajjwal1/bert-tiny...
 config.json: 100%|███████████████████████████████████████████████| 285/285 [00:00<00:00, 1.41MB/s]
 vocab.txt: 100%|███████████████████████████████████████████████| 232k/232k [00:00<00:00, 11.1MB/s]
