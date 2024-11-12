@@ -364,7 +364,42 @@ class PythonTracer:
             if pid:
                 self.events[pid].append(event_dict)
 
-            # Track file operations
+            # Enhanced file operation tracking
+            if category == 'file_ops':
+                pid_str = str(pid)
+
+                # Track file descriptor operations
+                if syscall_name in ('open', 'openat'):
+                    if getattr(event, 'ret', -1) > 0:  # Successful open
+                        fd = event.ret
+                        self.active_file_descriptors[f"{pid_str}_{fd}"] = {
+                            'filename': filename or '',
+                            'opened_at': timestamp
+                        }
+                        self.file_stats[pid_str]['opens'] += 1
+
+                elif syscall_name == 'close':
+                    fd = getattr(event, 'arg0', -1)
+                    fd_key = f"{pid_str}_{fd}"
+                    if fd_key in self.active_file_descriptors:
+                        self.file_stats[pid_str]['closes'] += 1
+                        del self.active_file_descriptors[fd_key]
+
+                elif syscall_name == 'read':
+                    fd = getattr(event, 'arg0', -1)
+                    bytes_read = getattr(event, 'ret', 0)
+                    if bytes_read > 0:
+                        self.file_stats[pid_str]['reads'] += 1
+                        self.file_stats[pid_str]['total_bytes_read'] += bytes_read
+
+                elif syscall_name == 'write':
+                    fd = getattr(event, 'arg0', -1)
+                    bytes_written = getattr(event, 'ret', 0)
+                    if bytes_written > 0:
+                        self.file_stats[pid_str]['writes'] += 1
+                        self.file_stats[pid_str]['total_bytes_written'] += bytes_written
+
+            # Track file operations (existing logic)
             if filename and category == 'file_ops':
                 if pid:
                     self.file_operations[pid].append({
@@ -1022,13 +1057,33 @@ def main():
         print("\nFile Operation Statistics:")
         print("-----------------------")
         for pid, data in trace_data["processes"].items():
+            print(f"\nPID {pid} File Operations:")
+
+            # Print detailed file statistics if available
+            if "file_statistics" in data:
+                stats = data["file_statistics"]
+                print(f"  Detailed Statistics:")
+                print(f"    Opens: {stats.get('opens', 0)}")
+                print(f"    Reads: {stats.get('reads', 0)} (Total bytes: {stats.get('total_bytes_read', 0)})")
+                print(f"    Writes: {stats.get('writes', 0)} (Total bytes: {stats.get('total_bytes_written', 0)})")
+                print(f"    Closes: {stats.get('closes', 0)}")
+
+            # Print operation counts (existing logic)
             if 'file_operations' in data:
-                print(f"\nPID {pid} File Operations:")
+                print(f"  Operation Counts:")
                 op_counts = defaultdict(int)
                 for op in data['file_operations']:
                     op_counts[op['operation']] += 1
                 for op, count in op_counts.items():
-                    print(f"  {op}: {count}")
+                    print(f"    {op}: {count}")
+
+            # Print active file descriptors if any
+            if "active_file_descriptors" in data:
+                active_fds = data["active_file_descriptors"]
+                if active_fds:
+                    print(f"  Active File Descriptors:")
+                    for fd_key, fd_info in active_fds.items():
+                        print(f"    {fd_key}: {fd_info['filename']}")
 
     except Exception as e:
         print(f"Error: {str(e)}")
