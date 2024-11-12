@@ -340,7 +340,11 @@ Detailed Event:
   Category: {category}
   Return: {getattr(event, 'ret', 0)}
   Command: {getattr(event, 'comm', b'').decode('utf-8', 'replace')}
-  Args: {getattr(event, 'arg0', 0)}, {getattr(event, 'arg1', 0)}, {getattr(event, 'arg2', 0)}
+  Args:
+    - fd/ptr: {getattr(event, 'arg0', 0)} {' (fd)' if syscall_name in ['read', 'write', 'close'] else ' (ptr)'}
+    - buf/op: {getattr(event, 'arg1', 0)} {' (buffer ptr)' if syscall_name in ['read', 'write'] else ' (operation)'}
+    - count/val: {getattr(event, 'arg2', 0)} {' (bytes)' if syscall_name in ['read', 'write'] else ' (value)'}
+  Filename: {getattr(event, 'filename', b'').decode('utf-8', 'replace') if hasattr(event, 'filename') else 'None'}
 """)
 
             # Create event dictionary with safe values
