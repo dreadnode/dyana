@@ -27,6 +27,16 @@ SYSCALL_CATEGORIES = {
         2: "open",
         3: "close",
         257: "openat",
+        0: "read",
+        1: "write",
+        87: "unlink",
+        82: "rename",
+        89: "readlink",
+        88: "symlink",
+        16: "lseek",
+        19: "lstat",
+        4: "stat",
+        5: "fstat",
     },
     'process_ops': {
         38: "clone",
@@ -249,10 +259,15 @@ class PythonTracer:
             # Initialize file tracking
             self.open_files = {}
             self.file_stats = defaultdict(lambda: {
+                'opens': 0,
                 'reads': 0,
                 'writes': 0,
-                'total_bytes': 0
+                'closes': 0,
+                'total_bytes_read': 0,
+                'total_bytes_written': 0
             })
+
+            self.active_file_descriptors = {}  # Track open file descriptors
 
             # Initialize process tracking
             self.child_processes = set()
