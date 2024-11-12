@@ -977,18 +977,30 @@ def main():
     script_args = []
     target_script = sys.argv[1]
 
-    # Handle --debug flag separately
+    # Handle debug flags
+    trace_debug = "--trace-debug" in sys.argv
+    script_debug = "--script-debug" in sys.argv
     debug_mode = "--debug" in sys.argv
-    if debug_mode:
+
+    if debug_mode or trace_debug:
         logger.setLevel(logging.DEBUG)
         for handler in logger.handlers:
             handler.setLevel(logging.DEBUG)
-        # Remove --debug from args that will be passed to the target script
-        sys.argv.remove("--debug")
+        if "--debug" in sys.argv:
+            sys.argv.remove("--debug")
+        if "--trace-debug" in sys.argv:
+            sys.argv.remove("--trace-debug")
+        logger.debug("Debug logging enabled")
+
+    if script_debug:
+        sys.argv.remove("--script-debug")
+        script_args.append("--debug")
+        logger.debug("Script debug mode enabled")
 
     # Get remaining args for the target script
     if len(sys.argv) > 2:
-        script_args = sys.argv[2:]
+        script_args.extend([arg for arg in sys.argv[2:]
+                          if arg not in ("--trace-debug", "--script-debug")])
 
     try:
         # Parse command line arguments
@@ -998,7 +1010,8 @@ def main():
             script_args = sys.argv[separator_index + 2:]
         else:
             target_script = sys.argv[1]
-            script_args = sys.argv[2:]
+            script_args = [arg for arg in sys.argv[2:]
+                         if arg not in ("--trace-debug", "--script-debug")]
 
         script_path = os.path.abspath(target_script)
         if not os.path.exists(script_path):
@@ -1099,8 +1112,8 @@ def main():
             print(f"\nPID {pid} File Operations:")
 
             # Print detailed file statistics if available
-            if "file_statistics" in data:
-                stats = data["file_statistics"]
+            if hasattr(tracer, 'file_stats') and str(pid) in tracer.file_stats:
+                stats = tracer.file_stats[str(pid)]
                 print(f"  Detailed Statistics:")
                 print(f"    Opens: {stats.get('opens', 0)}")
                 print(f"    Reads: {stats.get('reads', 0)} (Total bytes: {stats.get('total_bytes_read', 0)})")
@@ -1117,8 +1130,9 @@ def main():
                     print(f"    {op}: {count}")
 
             # Print active file descriptors if any
-            if "active_file_descriptors" in data:
-                active_fds = data["active_file_descriptors"]
+            if hasattr(tracer, 'active_file_descriptors'):
+                active_fds = {k: v for k, v in tracer.active_file_descriptors.items()
+                             if k.startswith(f"{pid}_")}
                 if active_fds:
                     print(f"  Active File Descriptors:")
                     for fd_key, fd_info in active_fds.items():

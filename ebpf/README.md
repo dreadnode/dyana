@@ -62,7 +62,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug" # ie loading bert_tiny from tokenizers
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --script-debug --trace-debug" # ie loading bert_tiny from tokenizers
 ```
 
 Or, if you prefer step by step:
@@ -102,7 +102,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --debug --trace-debug && ls -la traces/"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_bert_tiny_loader.py --script-debug --trace-debug"
 ```
 
 4. Run the tracer with a mount current directory to `/root/ebpf` in container if making local development changes to [the tracer](./ebpf_tracer.py) whilst specifying the model using `-v /path/to/your/model:/root/model \` and the `ebpf_loader_dynamic.py` dynamic loader
@@ -118,7 +118,7 @@ docker run -it --rm \
     -v $(pwd):/root/ebpf \
     --pid=host \
     ebpf-tracer \
-    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --debug --trace-debug && ls -la traces/"
+    sh -c "cd /root/ebpf && python3 ebpf_tracer.py ebpf_loader_dynamic.py --script-debug --trace-debug && ls -la traces/"
 ```
 
 
