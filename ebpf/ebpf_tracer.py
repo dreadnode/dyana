@@ -47,10 +47,6 @@ SYSCALL_CATEGORIES = {
     'memory_ops': {
         9: "mmap",
     },
-    'io_ops': {
-        0: "read",
-        1: "write",
-    },
     'system_info': {
         36: "getpid",
         79: "getcwd",
