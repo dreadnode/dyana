@@ -332,8 +332,16 @@ class PythonTracer:
             syscall_name = SYSCALLS.get(syscall_id, "unknown")
             category = SYSCALL_TO_CATEGORY.get(syscall_id, "unknown")
 
-            # Add debug logging
-            logger.debug(f"Processing event: pid={pid}, syscall={syscall_id}")
+            # Enhanced debug logging
+            logger.debug(f"""
+Detailed Event:
+  PID: {pid}
+  Syscall: {syscall_name} (ID: {syscall_id})
+  Category: {category}
+  Return: {getattr(event, 'ret', 0)}
+  Command: {getattr(event, 'comm', b'').decode('utf-8', 'replace')}
+  Args: {getattr(event, 'arg0', 0)}, {getattr(event, 'arg1', 0)}, {getattr(event, 'arg2', 0)}
+""")
 
             # Create event dictionary with safe values
             event_dict = {
@@ -353,7 +361,9 @@ class PythonTracer:
                 filename = getattr(event, 'filename', b'').decode('utf-8', 'replace')
                 if filename:
                     event_dict['filename'] = filename
-            except Exception:
+                    logger.debug(f"File operation detected: {filename}")
+            except Exception as e:
+                logger.debug(f"Error processing filename: {e}")
                 filename = None
 
             # Store the event
@@ -363,22 +373,27 @@ class PythonTracer:
             # Enhanced file operation tracking
             if category == 'file_ops':
                 pid_str = str(pid)
+                logger.debug(f"Processing file operation: {syscall_name}")
 
                 # Track file descriptor operations
                 if syscall_name in ('open', 'openat'):
-                    if getattr(event, 'ret', -1) > 0:  # Successful open
-                        fd = event.ret
+                    ret_val = getattr(event, 'ret', -1)
+                    logger.debug(f"Open operation: ret={ret_val}, filename={filename}")
+                    if ret_val > 0:  # Successful open
+                        fd = ret_val
                         self.active_file_descriptors[f"{pid_str}_{fd}"] = {
                             'filename': filename or '',
                             'opened_at': timestamp
                         }
                         self.file_stats[pid_str]['opens'] += 1
+                        logger.debug(f"Tracked open operation: {self.file_stats[pid_str]}")
 
                 elif syscall_name == 'close':
                     fd = getattr(event, 'arg0', -1)
                     fd_key = f"{pid_str}_{fd}"
                     if fd_key in self.active_file_descriptors:
                         self.file_stats[pid_str]['closes'] += 1
+                        logger.debug(f"Tracked close operation: fd={fd}")
                         del self.active_file_descriptors[fd_key]
 
                 elif syscall_name == 'read':
@@ -387,6 +402,7 @@ class PythonTracer:
                     if bytes_read > 0:
                         self.file_stats[pid_str]['reads'] += 1
                         self.file_stats[pid_str]['total_bytes_read'] += bytes_read
+                        logger.debug(f"Tracked read operation: bytes={bytes_read}")
 
                 elif syscall_name == 'write':
                     fd = getattr(event, 'arg0', -1)
@@ -394,28 +410,36 @@ class PythonTracer:
                     if bytes_written > 0:
                         self.file_stats[pid_str]['writes'] += 1
                         self.file_stats[pid_str]['total_bytes_written'] += bytes_written
+                        logger.debug(f"Tracked write operation: bytes={bytes_written}")
 
             # Track file operations (existing logic)
             if filename and category == 'file_ops':
                 if pid:
-                    self.file_operations[pid].append({
+                    file_op = {
                         'timestamp': timestamp,
                         'operation': syscall_name,
                         'filename': filename,
                         'result': getattr(event, 'ret', 0)
-                    })
+                    }
+                    self.file_operations[pid].append(file_op)
+                    logger.debug(f"Added file operation: {file_op}")
 
                 # Categorize file access patterns
                 if any(ext in filename.lower() for ext in ['.bin', '.pt', '.pth', '.onnx']):
                     self.file_patterns['model_files'].append(filename)
+                    logger.debug(f"Categorized as model file: {filename}")
                 elif any(ext in filename.lower() for ext in ['.json', '.yaml', '.config']):
                     self.file_patterns['configs'].append(filename)
+                    logger.debug(f"Categorized as config file: {filename}")
                 elif '/tmp/' in filename:
                     self.file_patterns['temp_files'].append(filename)
+                    logger.debug(f"Categorized as temp file: {filename}")
                 elif '.so' in filename or '.py' in filename:
                     self.file_patterns['libraries'].append(filename)
+                    logger.debug(f"Categorized as library: {filename}")
                 elif '.weight' in filename or '.bias' in filename:
                     self.file_patterns['weights'].append(filename)
+                    logger.debug(f"Categorized as weights file: {filename}")
 
             # Track execution phases safely
             comm = event_dict['comm']
@@ -431,11 +455,13 @@ class PythonTracer:
                             'pid': pid,
                             'event': event_dict
                         })
+                        logger.debug(f"Tracked execution phase: {phase_name}")
                 except Exception as e:
                     logger.debug(f"Failed to parse phase from comm: {comm}, error: {e}")
 
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
+            logger.debug(f"Error details:", exc_info=True)
 
     def _get_process_memory(self, pid):
         """Safely get process memory information."""
