@@ -382,39 +382,36 @@ Detailed Event:
                 # Track file descriptor operations
                 if syscall_name in ('open', 'openat'):
                     ret_val = getattr(event, 'ret', -1)
-                    logger.debug(f"Open operation: ret={ret_val}, filename={filename}")
-                    if ret_val > 0:  # Successful open
+                    if ret_val > 0 and ret_val < 1000000:  # Sanity check on fd value
                         fd = ret_val
                         self.active_file_descriptors[f"{pid_str}_{fd}"] = {
                             'filename': filename or '',
                             'opened_at': timestamp
                         }
                         self.file_stats[pid_str]['opens'] += 1
-                        logger.debug(f"Tracked open operation: {self.file_stats[pid_str]}")
-
-                elif syscall_name == 'close':
-                    fd = getattr(event, 'arg0', -1)
-                    fd_key = f"{pid_str}_{fd}"
-                    if fd_key in self.active_file_descriptors:
-                        self.file_stats[pid_str]['closes'] += 1
-                        logger.debug(f"Tracked close operation: fd={fd}")
-                        del self.active_file_descriptors[fd_key]
+                        logger.debug(f"Tracked open operation: fd={fd}, filename={filename}")
 
                 elif syscall_name == 'read':
-                    fd = getattr(event, 'arg0', -1)
                     bytes_read = getattr(event, 'ret', 0)
-                    if bytes_read > 0:
+                    if 0 < bytes_read < 1073741824:  # Sanity check: max 1GB per read
                         self.file_stats[pid_str]['reads'] += 1
                         self.file_stats[pid_str]['total_bytes_read'] += bytes_read
                         logger.debug(f"Tracked read operation: bytes={bytes_read}")
 
                 elif syscall_name == 'write':
-                    fd = getattr(event, 'arg0', -1)
                     bytes_written = getattr(event, 'ret', 0)
-                    if bytes_written > 0:
+                    if 0 < bytes_written < 1073741824:  # Sanity check: max 1GB per write
                         self.file_stats[pid_str]['writes'] += 1
                         self.file_stats[pid_str]['total_bytes_written'] += bytes_written
                         logger.debug(f"Tracked write operation: bytes={bytes_written}")
+
+                elif syscall_name == 'close':
+                    fd = getattr(event, 'arg0', -1)
+                    fd_key = f"{pid_str}_{fd}"
+                    if fd_key in self.active_file_descriptors and fd < 1000000:  # Sanity check on fd
+                        self.file_stats[pid_str]['closes'] += 1
+                        logger.debug(f"Tracked close operation: fd={fd}")
+                        del self.active_file_descriptors[fd_key]
 
             # Track file operations (existing logic)
             if filename and category == 'file_ops':
@@ -1120,9 +1117,19 @@ def main():
                 stats = tracer.file_stats[str(pid)]
                 print(f"  Detailed Statistics:")
                 print(f"    Opens: {stats.get('opens', 0)}")
-                print(f"    Reads: {stats.get('reads', 0)} (Total bytes: {stats.get('total_bytes_read', 0)})")
-                print(f"    Writes: {stats.get('writes', 0)} (Total bytes: {stats.get('total_bytes_written', 0)})")
+                print(f"    Reads: {stats.get('reads', 0)} (Total bytes: {stats.get('total_bytes_read', 0):,})")
+                print(f"    Writes: {stats.get('writes', 0)} (Total bytes: {stats.get('total_bytes_written', 0):,})")
                 print(f"    Closes: {stats.get('closes', 0)}")
+
+            # Print active file descriptors if any
+            if hasattr(tracer, 'active_file_descriptors'):
+                active_fds = {k: v for k, v in tracer.active_file_descriptors.items()
+                             if k.startswith(f"{pid}_") and
+                             int(k.split('_')[1]) < 1000000}  # Filter out invalid FDs
+                if active_fds:
+                    print(f"  Active File Descriptors:")
+                    for fd_key, fd_info in active_fds.items():
+                        print(f"    {fd_key}: {fd_info.get('filename', 'Unknown')}")
 
             # Print operation counts (existing logic)
             if 'file_operations' in data:
