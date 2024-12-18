@@ -2,12 +2,12 @@
 name = "cuda_tracer"
 version = "0.1.0"
 description = "A specialized tool for profiling CUDA operations in ML models"
-authors = ["ads ads@dreadnode.io"]
+authors = ["ads <ads@dreadnode.io>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
 torch = "^2.0.0"
-bcc = "^0.18.0"
+bcc = "0.1.10"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^6.0"
