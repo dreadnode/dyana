@@ -3,6 +3,7 @@ name = "cuda_tracer"
 version = "0.1.0"
 description = "A specialized tool for profiling CUDA operations in ML models"
 authors = ["ads <ads@dreadnode.io>"]
+packages = [{ include = "cuda_tracer", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"

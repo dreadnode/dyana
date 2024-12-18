@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  cuda-tracer:
+  cuda_tracer:
     build:
       context: .
       dockerfile: Dockerfile
