@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "cudyana"
+version = "0.1.0"
+description = "CUDA specific eBPF experiments."
+authors = ["simone <simone@dreadnode.io>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+bcc = "^0.1.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
