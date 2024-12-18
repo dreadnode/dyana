@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "cuda_tracer"
+version = "0.1.0"
+description = "A specialized tool for profiling CUDA operations in ML models"
+authors = ["ads ads@dreadnode.io"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+torch = "^2.0.0"
+bcc = "^0.18.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^6.0"
+black = "^23.3.0"
+isort = "^5.12.0"
+mypy = "^1.3.0"
+pytest-cov = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+ignore_missing_imports = true

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  cuda-tracer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app/cuda_tracer
+      - /sys/kernel/debug:/sys/kernel/debug
+    privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    command: python3 -m pytest tests/
