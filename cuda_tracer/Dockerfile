@@ -17,18 +17,12 @@ RUN pip3 install poetry
 # Set working directory
 WORKDIR /app/cuda_tracer
 
-# Copy project files
-COPY pyproject.toml poetry.lock ./
+# Copy entire project first
+COPY . .
 
-# Install dependencies
+# Install dependencies and project
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
-
-# Install package in editable mode
-RUN pip install -e .
-
-# Copy source code
-COPY . .
 
 # Default command
 CMD ["poetry", "run", "pytest", "tests/"]
