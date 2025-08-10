@@ -606,13 +606,13 @@ typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
 name = "pydantic-yaml"
-version = "1.5.1"
-description = "YAML reading/writing for Pydantic models."
+version = "1.6.0"
+description = "YAML reading/writing for Pydantic models"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "pydantic_yaml-1.5.1-py3-none-any.whl", hash = "sha256:c83953904c4801d15a1b6fbbbe46c37b14cb177f21f9cb6ee5b752d385ce797d"},
-    {file = "pydantic_yaml-1.5.1.tar.gz", hash = "sha256:8345ae97ad5861652df571486051a5b051d2abdfc8092ddb0e4e0383e5da9a12"},
+    {file = "pydantic_yaml-1.6.0-py3-none-any.whl", hash = "sha256:02cb800b455b68daeeb74ad736c252a94a0b203da5fbbeef02539d468e1d98f8"},
+    {file = "pydantic_yaml-1.6.0.tar.gz", hash = "sha256:ce5f10b65d95ca45846a36ea8dae54e550fa3058e7d6218e0179184d9bf6f660"},
 ]
 
 [package.dependencies]
@@ -621,7 +621,7 @@ pydantic = ">=1.8"
 typing-extensions = ">=4.5.0"
 
 [package.extras]
-dev = ["mypy (==1.15.0)", "pre-commit (==4.2.0)", "pytest (==8.3.5)", "ruff (==0.11.11)", "setuptools (>=61.0.0)", "setuptools-scm[toml] (>=6.2)"]
+dev = ["mypy (==1.17.1)", "pre-commit (==4.2.0)", "pytest (==8.4.1)", "ruff (==0.12.8)", "setuptools (>=61.0.0)", "setuptools-scm[toml] (>=6.2)"]
 docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]", "pygments", "pymdown-extensions", "types-setuptools"]
 
 [[package]]
