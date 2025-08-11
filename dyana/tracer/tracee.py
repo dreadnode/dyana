@@ -8,7 +8,7 @@ from datetime import datetime
 
 import docker as docker_pkg
 from pydantic import BaseModel
-from rich import print
+from rich import print as rich_print
 
 import dyana
 import dyana.docker as docker
@@ -78,7 +78,7 @@ class Tracer:
     ] + SECURITY_EVENTS
 
     def __init__(self, loader: Loader, policy: pathlib.Path | None = None):
-        print(":eye_in_speech_bubble:  [bold]tracer[/]: initializing ...")
+        rich_print(":eye_in_speech_bubble:  [bold]tracer[/]: initializing ...")
 
         docker.pull(Tracer.DOCKER_IMAGE)
 
@@ -97,7 +97,7 @@ class Tracer:
         self.policy = policy.resolve().absolute() if policy else None
         self.policy_volume: str | None = None
         if policy:
-            print(f":eye_in_speech_bubble:  [bold]tracer[/]: using custom policy [yellow]{policy}[/]")
+            rich_print(f":eye_in_speech_bubble:  [bold]tracer[/]: using custom policy [yellow]{policy}[/]")
             self.policy_volume = f"/{policy.name}"
             self.args.append("--policy")
             self.args.append(self.policy_volume)
@@ -156,7 +156,7 @@ class Tracer:
             if line.startswith("Error:"):
                 self.reader_error = line.replace("Error:", "").strip()
             else:
-                print(f"[dim]{line}[/]")
+                rich_print(f"[dim]{line}[/]")
             return
 
         message = json.loads(line)
@@ -177,11 +177,11 @@ class Tracer:
             # other messages
             if message["level"] in ["fatal", "error"]:
                 err = message["error"].strip()
-                print(f":exclamation: [bold red]tracer error:[/]: {err}")
+                rich_print(f":exclamation: [bold red]tracer error:[/]: {err}")
                 self.errors.append(err)
             else:
                 msg = message["msg"].strip()
-                print(f":eye_in_speech_bubble:  [bold]tracer[/]: {msg}")
+                rich_print(f":eye_in_speech_bubble:  [bold]tracer[/]: {msg}")
         else:
             # actual events
             self.trace.append(message)
@@ -223,7 +223,7 @@ class Tracer:
 
     def _stop(self) -> None:
         if self.container:
-            print(":eye_in_speech_bubble:  [bold]tracer[/]: stopping ...")
+            rich_print(":eye_in_speech_bubble:  [bold]tracer[/]: stopping ...")
             self.container.stop()
 
     def run_trace(
@@ -231,7 +231,7 @@ class Tracer:
     ) -> Trace:
         self._start()
 
-        print(":eye_in_speech_bubble:  [bold]tracer[/]: started ...")
+        rich_print(":eye_in_speech_bubble:  [bold]tracer[/]: started ...")
 
         started_at = datetime.now()
         run = self.loader.run(allow_network, allow_gpus, allow_volume_write)

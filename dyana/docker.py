@@ -5,7 +5,7 @@ import shutil
 
 import docker
 from docker.models.images import Image
-from rich import print
+from rich import print as rich_print
 
 DOCKER_SOCKET_PATH = "/var/run/docker.sock"
 DOCKER_SOCKET_EXISTS = os.path.exists(DOCKER_SOCKET_PATH)
@@ -21,7 +21,7 @@ except docker.errors.DockerException:
         # https://github.com/abiosoft/colima/issues/468
         try:
             client = docker.DockerClient(base_url="unix://" + COLIMA_SOCKET_PATH)
-            print(f":whale: [bold]docker[/]: found {COLIMA_SOCKET_PATH}, using colima runtime")
+            rich_print(f":whale: [bold]docker[/]: found {COLIMA_SOCKET_PATH}, using colima runtime")
         except docker.errors.DockerException:
             client = None
     else:
@@ -74,7 +74,7 @@ def build(
 
     norm_name = sanitized_agent_name(name)
     if norm_name != name:
-        print(f"[yellow]Warning:[/] sanitized agent name from '{name}' to '{norm_name}'")
+        rich_print(f"[yellow]Warning:[/] sanitized agent name from '{name}' to '{norm_name}'")
         name = norm_name
 
     id: str | None = None
@@ -90,11 +90,11 @@ def build(
         rm=True,
     ):
         if "error" in item:
-            print()
+            rich_print()
             raise Exception(item["error"])
         elif "stream" in item:
             if verbose:
-                print("[dim]" + item["stream"].strip() + "[/]")
+                rich_print("[dim]" + item["stream"].strip() + "[/]")
         elif "aux" in item:
             id = item["aux"].get("ID")
 

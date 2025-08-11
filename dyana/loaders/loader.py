@@ -9,7 +9,7 @@ from datetime import datetime
 import docker as docker_pkg
 from pydantic import BaseModel
 from pydantic_yaml import parse_yaml_raw_as
-from rich import print
+from rich import print as rich_print
 
 import dyana.docker as docker
 import dyana.loaders as loaders
@@ -108,7 +108,7 @@ class Loader:
                     if arg.required and not self.args:
                         raise ValueError(f"Argument --{arg.name} is required")
 
-            print(f":whale: [bold]loader[/]: initializing loader [bold]{name}[/]")
+            rich_print(f":whale: [bold]loader[/]: initializing loader [bold]{name}[/]")
             # copy the base dyana.py to the loader directory
             # TODO: ideally the file name should be randomized in order to avoid low-hanging fruits in terms
             # of sandbox detection techniques
@@ -119,7 +119,7 @@ class Loader:
                 self.path, self.image_name, platform=self.platform, build_args=self.build_args, verbose=verbose
             )
             if self.platform:
-                print(
+                rich_print(
                     f":whale: [bold]loader[/]: using image [green]{self.image.tags[0]}[/] [dim]({self.image.id})[/] ({self.platform})"
                 )
             # else:
@@ -183,18 +183,18 @@ class Loader:
 
         if self.settings and self.settings.network:
             allow_network = True
-            print(":popcorn: [bold]loader[/]: [yellow]required bridged network access[/]")
+            rich_print(":popcorn: [bold]loader[/]: [yellow]required bridged network access[/]")
 
         elif allow_network:
-            print(":popcorn: [bold]loader[/]: [yellow]warning: allowing bridged network access to the container[/]")
+            rich_print(":popcorn: [bold]loader[/]: [yellow]warning: allowing bridged network access to the container[/]")
 
         if allow_volume_write:
-            print(":popcorn: [bold]loader[/]: [yellow]warning: allowing volume write to the container[/]")
+            rich_print(":popcorn: [bold]loader[/]: [yellow]warning: allowing volume write to the container[/]")
 
         if arguments:
-            print(f":popcorn: [bold]loader[/]: executing with arguments [dim]{arguments}[/] ...")
+            rich_print(f":popcorn: [bold]loader[/]: executing with arguments [dim]{arguments}[/] ...")
         else:
-            print(":popcorn: [bold]loader[/]: executing ...")
+            rich_print(":popcorn: [bold]loader[/]: executing ...")
 
         try:
             self.output = ""
@@ -207,14 +207,14 @@ class Loader:
                 if not os.path.exists(self.save_to):
                     os.makedirs(self.save_to)
 
-                print(f":popcorn: [bold]loader[/]: saving artifacts to [dim]{self.save_to}[/]")
+                rich_print(f":popcorn: [bold]loader[/]: saving artifacts to [dim]{self.save_to}[/]")
 
             if self.settings and self.settings.volumes:
                 for vol in self.settings.volumes:
                     host = os.path.expanduser(vol.host)
                     if os.path.exists(host):
                         volumes[host] = vol.guest
-                        print(f":popcorn: [bold]loader[/]: mounting volume [dim]{host}[/] to [dim]{vol.guest}[/]")
+                        rich_print(f":popcorn: [bold]loader[/]: mounting volume [dim]{host}[/] to [dim]{vol.guest}[/]")
 
             self.container = docker.run_detached(
                 self.image,
@@ -242,7 +242,7 @@ class Loader:
 
                 if (datetime.now() - started_at).total_seconds() > self.timeout:
                     self.container.kill()
-                    print(":popcorn: [bold]loader[/]: [red]timeout reached, killing container[/]")
+                    rich_print(":popcorn: [bold]loader[/]: [red]timeout reached, killing container[/]")
                     return self._create_errored_run("timeout", "timeout reached, killing container")
 
             # loaders could generate all sorts of output before flushing the JSON profile
@@ -267,12 +267,12 @@ class Loader:
                         run.stdout = extra_output
                 return run
             except Exception as e:
-                print(f"Validation error: {e}")
-                print(f"Invalid JSON: [bold red]{self.output}[/]")
+                rich_print(f"Validation error: {e}")
+                rich_print(f"Invalid JSON: [bold red]{self.output}[/]")
                 raise e
 
         except docker_pkg.errors.ContainerError as ce:
-            print(f"\nContainer failed with exit code {ce.exit_status}")
-            print("\nContainer output:")
-            print(ce.stderr.decode("utf-8"))
+            rich_print(f"\nContainer failed with exit code {ce.exit_status}")
+            rich_print("\nContainer output:")
+            rich_print(ce.stderr.decode("utf-8"))
             return self._create_errored_run("container_execution_error", ce.stderr.decode("utf-8"))

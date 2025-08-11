@@ -52,6 +52,19 @@ disallow_untyped_calls = false
 line-length = 120
 indent-width = 4
 target-version = "py310"
+exclude = [
+    ".git",
+    ".git-rewrite",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pypackages__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+]
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -72,19 +85,6 @@ ignore = [
     "A001", # shadowing built-in
     "A002", # shadowing built-in
 ]
-exclude = [
-    ".git",
-    ".git-rewrite",
-    ".mypy_cache",
-    ".ruff_cache",
-    "__pypackages__",
-    "build",
-    "dist",
-    ".venv",
-    "venv",
-]
-
-[tool.ruff.lint]
 fixable = ["ALL"]
 unfixable = ["B"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

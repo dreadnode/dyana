@@ -1,6 +1,6 @@
 import typing as t
 
-from rich import print
+from rich import print as rich_print
 
 
 # https://stackoverflow.com/questions/1094841/get-a-human-readable-version-of-a-file-size
@@ -24,17 +24,17 @@ def delta_fmt(before: int, after: int) -> str:
 def view_legacy_ram(run: dict[str, t.Any]) -> None:
     ram = run["ram"]
     if ram:
-        print("[bold yellow]RAM Usage:[/]")
+        rich_print("[bold yellow]RAM Usage:[/]")
         ram_stages = list(ram.keys())
         prev_stage = None
         for stage in ram_stages:
             if prev_stage is None:
-                print(f"  * {stage} : {sizeof_fmt(ram[stage])}")
+                rich_print(f"  * {stage} : {sizeof_fmt(ram[stage])}")
             else:
-                print(f"  * {stage} : {delta_fmt(ram[prev_stage], ram[stage])}")
+                rich_print(f"  * {stage} : {delta_fmt(ram[prev_stage], ram[stage])}")
             prev_stage = stage
 
-        print()
+        rich_print()
 
 
 def view_legacy_gpus(run: dict[str, t.Any]) -> None:
@@ -57,7 +57,7 @@ def view_legacy_gpus(run: dict[str, t.Any]) -> None:
                 changes.append(change)
 
             if any(changes):
-                print("[bold green]GPU Usage:[/]")
+                rich_print("[bold green]GPU Usage:[/]")
                 for i in range(num_gpus):
                     if not changes[i]:
                         continue
@@ -65,34 +65,34 @@ def view_legacy_gpus(run: dict[str, t.Any]) -> None:
                     dev_name = run["gpu"][first_gpu_stage][i]["device_name"]
                     dev_total = run["gpu"][first_gpu_stage][i]["total_memory"]
 
-                    print(f"  [green]{dev_name}[/] [dim]|[/] {sizeof_fmt(dev_total)}")
+                    rich_print(f"  [green]{dev_name}[/] [dim]|[/] {sizeof_fmt(dev_total)}")
 
                     prev_stage = None
                     for stage in gpu_stages:
                         used = run["gpu"][stage][i]["total_memory"] - run["gpu"][stage][i]["free_memory"]
                         if prev_stage is None:
-                            print(f"  * {stage} : {sizeof_fmt(used)}")
+                            rich_print(f"  * {stage} : {sizeof_fmt(used)}")
                         else:
-                            print(f"  * {stage} : {delta_fmt(prev_stage, used)}")
+                            rich_print(f"  * {stage} : {delta_fmt(prev_stage, used)}")
                         prev_stage = used
 
-                    print()
+                    rich_print()
 
 
 def view_legacy_disk_usage(run: dict[str, t.Any]) -> None:
     if "disk" in run and run["disk"]:
-        print("[bold yellow]Disk Usage:[/]")
+        rich_print("[bold yellow]Disk Usage:[/]")
         disk = run["disk"]
         disk_stages = list(disk.keys())
         prev_stage = None
         for stage in disk_stages:
             if prev_stage is None:
-                print(f"  * {stage} : {sizeof_fmt(disk[stage])}")
+                rich_print(f"  * {stage} : {sizeof_fmt(disk[stage])}")
             else:
-                print(f"  * {stage} : {delta_fmt(disk[prev_stage], disk[stage])}")
+                rich_print(f"  * {stage} : {delta_fmt(disk[prev_stage], disk[stage])}")
             prev_stage = stage
 
-        print()
+        rich_print()
 
 
 def view_legacy_network_usage(run: dict[str, t.Any]) -> None:
@@ -110,7 +110,7 @@ def view_legacy_network_usage(run: dict[str, t.Any]) -> None:
                     break
 
         if any_change:
-            print("[bold yellow]Network Usage:[/]")
+            rich_print("[bold yellow]Network Usage:[/]")
 
             for interface in interfaces:
                 # Check if there were any network changes across stages
@@ -123,20 +123,20 @@ def view_legacy_network_usage(run: dict[str, t.Any]) -> None:
                 if not had_network_activity:
                     continue
 
-                print(f"  [bold]{interface}[/]")
+                rich_print(f"  [bold]{interface}[/]")
                 prev_stage = None
                 for stage in stages:
                     if prev_stage is None:
                         rx_fmt = sizeof_fmt(network[stage][interface]["rx"])
                         tx_fmt = sizeof_fmt(network[stage][interface]["tx"])
-                        print(f"    {stage} : rx={rx_fmt} tx={tx_fmt}")
+                        rich_print(f"    {stage} : rx={rx_fmt} tx={tx_fmt}")
                     else:
                         rx_fmt = delta_fmt(network[prev_stage][interface]["rx"], network[stage][interface]["rx"])
                         tx_fmt = delta_fmt(network[prev_stage][interface]["tx"], network[stage][interface]["tx"])
-                        print(f"    {stage} : rx={rx_fmt} tx={tx_fmt}")
+                        rich_print(f"    {stage} : rx={rx_fmt} tx={tx_fmt}")
                     prev_stage = stage
 
-                print()
+                rich_print()
 
 
 def count_package_prefixes(path_dict: dict[str, str], level: int = 2) -> dict[str, int]:
@@ -158,15 +158,15 @@ def count_package_prefixes(path_dict: dict[str, str], level: int = 2) -> dict[st
 
 def view_legacy_extra_imports(key: str, value: t.Any) -> None:
     if value:
-        print("[bold yellow]Top Level Imports:[/] ")
+        rich_print("[bold yellow]Top Level Imports:[/] ")
         as_dict = dict(value.items())
         as_counters = count_package_prefixes(as_dict, level=1)
         for package, count in sorted(as_counters.items(), key=lambda x: x[1], reverse=True):
             if count > 1:
-                print(f"  * [green]{package}[/][dim].*[/]: {count}")
+                rich_print(f"  * [green]{package}[/][dim].*[/]: {count}")
             else:
-                print(f"  * [green]{package}[/]")
-        print()
+                rich_print(f"  * [green]{package}[/]")
+        rich_print()
 
 
 def view_legacy_extra(run: dict[str, t.Any]) -> None:
@@ -180,7 +180,7 @@ def view_legacy_extra(run: dict[str, t.Any]) -> None:
                 unknown.append(k)
 
     if unknown:
-        print("[bold yellow]Other Records:[/]")
+        rich_print("[bold yellow]Other Records:[/]")
         for k in unknown:
-            print(f"  * {k}")
-        print()
+            rich_print(f"  * {k}")
+        rich_print()

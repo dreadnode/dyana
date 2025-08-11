@@ -4,7 +4,8 @@ import platform as platform_pkg
 # NOTE: json is too slow
 import cysimdjson
 import typer
-from rich import box, print
+from rich import box
+from rich import print as rich_print
 from rich.table import Table
 
 import dyana.loaders as loaders_pkg
@@ -60,7 +61,7 @@ def loaders(
             loader.settings.description if loader.settings else "",
         )
 
-    print(table)
+    rich_print(table)
 
 
 @cli.command(
@@ -74,7 +75,7 @@ def help(
         view_loader_help(Loader(name=loader, build=False), markdown)
 
     except Exception as e:
-        print(f":cross_mark: [red]{e}[/]")
+        rich_print(f":cross_mark: [red]{e}[/]")
         exit(1)
 
 
@@ -123,7 +124,7 @@ def trace(
 
         trace = the_tracer.run_trace(allow_network, not no_gpu, allow_volume_write)
 
-        print(f":card_file_box:  saving {len(trace.events)} events to {output}\n")
+        rich_print(f":card_file_box:  saving {len(trace.events)} events to {output}\n")
 
         with open(output, "w") as f:
             f.write(trace.model_dump_json())
@@ -132,9 +133,9 @@ def trace(
     except Exception as e:
         serr = str(e)
         if "could not select device driver" in serr and "capabilities: [[gpu]]" in serr:
-            print(":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]")
+            rich_print(":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]")
         else:
-            print(f":cross_mark: [bold][red]error:[/] [red]{e}[/]")
+            rich_print(f":cross_mark: [bold][red]error:[/] [red]{e}[/]")
 
         if verbose:
             raise
