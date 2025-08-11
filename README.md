@@ -23,8 +23,8 @@
     <a href="https://github.com/dreadnode/dyana/actions/workflows/ci.yml">
         <img alt="GitHub Actions Workflow Status" src="https://github.com/dreadnode/dyana/actions/workflows/ci.yml/badge.svg">
     </a>
-    <a href="https://github.com/dreadnode/dyana/actions/workflows/renovate.yaml/badge.svg">
-        <img alt="Renovate Status" src="https://github.com/dreadnode/dyana/actions/workflows/renovate.yaml">
+    <a href="https://github.com/dreadnode/dyana/actions/workflows/renovate.json5/badge.svg">
+        <img alt="Renovate Status" src="https://github.com/dreadnode/dyana/actions/workflows/renovate.json5">
     </a>
 </h4>
 
