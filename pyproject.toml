@@ -12,7 +12,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-typer = "^0.16.0"
+typer = "^0.24.0"
 pydantic = "^2.9.2"
 docker = "^7.1.0"
 rich = "^14.0.0"
