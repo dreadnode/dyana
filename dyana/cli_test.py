@@ -177,9 +177,7 @@ class TestTraceCommand:
     @patch("dyana.cli.Tracer.__init__", _noop_tracer_init)
     @patch(
         "dyana.cli.Tracer.run_trace",
-        side_effect=RuntimeError(
-            "could not select device driver '' with capabilities: [[gpu]]"
-        ),
+        side_effect=RuntimeError("could not select device driver '' with capabilities: [[gpu]]"),
     )
     @patch("dyana.cli.Loader.__init__", _noop_loader_init)
     def test_trace_gpu_error(self, _mock_run: t.Any) -> None:

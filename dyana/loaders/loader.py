@@ -184,7 +184,9 @@ class Loader:
             rich_print(":popcorn: [bold]loader[/]: [yellow]required bridged network access[/]")
 
         elif allow_network:
-            rich_print(":popcorn: [bold]loader[/]: [yellow]warning: allowing bridged network access to the container[/]")
+            rich_print(
+                ":popcorn: [bold]loader[/]: [yellow]warning: allowing bridged network access to the container[/]"
+            )
 
         if allow_volume_write:
             rich_print(":popcorn: [bold]loader[/]: [yellow]warning: allowing volume write to the container[/]")

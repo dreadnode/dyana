@@ -18,62 +18,48 @@ class TestProfiler:
 
     def test_singleton(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             assert Profiler.instance is p
 
     def test_on_stage(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="test", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="test", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.on_stage("after_load")
             assert len(p._stages) == 2
 
     def test_track_error(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.track_error("loader", "something broke")
             assert p._errors == {"loader": "something broke"}
 
     def test_track_warning(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.track_warning("pip", "could not import")
             assert p._warnings == {"pip": "could not import"}
 
     def test_track_extra(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.track_extra("imports", {"os": "/usr/lib"})
             assert p._extra == {"imports": {"os": "/usr/lib"}}
 
     def test_track(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.track("custom_key", "custom_value")
             assert p._additionals == {"custom_key": "custom_value"}
 
     def test_as_dict(self) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             p = Profiler()
             p.track_error("err", "msg")
             result = p.as_dict()
@@ -85,9 +71,7 @@ class TestProfiler:
 
     def test_flush(self, capsys: t.Any) -> None:
         with patch("dyana.loaders.base.dyana.Stage.create") as mock_create:
-            mock_create.return_value = Stage(
-                name="start", timestamp=0, ram=0, disk=0, network={}, imports={}
-            )
+            mock_create.return_value = Stage(name="start", timestamp=0, ram=0, disk=0, network={}, imports={})
             Profiler()
             Profiler.flush()
             captured = capsys.readouterr()
@@ -151,7 +135,9 @@ class TestStageCreate:
             patch("dyana.loaders.base.dyana.get_peak_rss", return_value=1024),
             patch("dyana.loaders.base.dyana.get_disk_usage", return_value=2048),
             patch("dyana.loaders.base.dyana.get_network_stats", return_value={}),
-            patch("dyana.loaders.base.dyana.get_current_imports", return_value={"os": "/a", "sys": "/b", "new_mod": "/c"}),
+            patch(
+                "dyana.loaders.base.dyana.get_current_imports", return_value={"os": "/a", "sys": "/b", "new_mod": "/c"}
+            ),
         ):
             stage = Stage.create("test", prev_imports={"os": "/a", "sys": "/b"})
             assert "new_mod" in stage.imports

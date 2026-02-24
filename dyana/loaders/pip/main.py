@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import glob
 import importlib
@@ -5,8 +7,6 @@ import os
 import re
 import subprocess
 import sys
-
-from dyana import Profiler  # type: ignore[attr-defined]
 
 
 def find_site_packages() -> str | None:
@@ -67,6 +67,8 @@ def get_package_import_names(package_name: str) -> set[str]:
 
 
 if __name__ == "__main__":
+    from dyana import Profiler  # type: ignore[attr-defined]
+
     parser = argparse.ArgumentParser(description="Install a Python package via PIP")
     parser.add_argument("--package", help="PIP compatible package name or expression", required=True)
     args = parser.parse_args()

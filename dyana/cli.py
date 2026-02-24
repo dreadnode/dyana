@@ -139,7 +139,9 @@ def trace(
     except Exception as e:
         serr = str(e)
         if "could not select device driver" in serr and "capabilities: [[gpu]]" in serr:
-            rich_print(":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]")
+            rich_print(
+                ":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]"
+            )
         else:
             rich_print(f":cross_mark: [bold][red]error:[/] [red]{e}[/]")
 
