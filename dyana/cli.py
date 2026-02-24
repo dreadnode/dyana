@@ -82,7 +82,7 @@ def help(
 
     except Exception as e:
         rich_print(f":cross_mark: [red]{e}[/]")
-        exit(1)
+        raise typer.Exit(code=1) from None
 
 
 @cli.command(
@@ -146,7 +146,7 @@ def trace(
         if verbose:
             raise
         else:
-            exit(1)
+            raise typer.Exit(code=1) from None
 
 
 @cli.command(help="Show a summary of the trace.")

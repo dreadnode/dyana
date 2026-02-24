@@ -1,10 +1,15 @@
 import json
 import re
 import typing as t
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from dyana.cli import cli
+from dyana.loaders.base.dyana import Stage
+from dyana.loaders.loader import Run
+from dyana.tracer.tracee import Trace
 
 runner = CliRunner()
 
@@ -129,3 +134,99 @@ class TestSummaryCommand:
     def test_summary_missing_file(self) -> None:
         result = runner.invoke(cli, ["summary", "--trace-path", "/nonexistent/trace.json"])
         assert result.exit_code != 0
+
+
+def _noop_loader_init(self: t.Any, **kwargs: t.Any) -> None:
+    self.name = kwargs.get("name", "automodel")
+    self.settings = None
+    self.container_id = None
+
+
+def _noop_tracer_init(self: t.Any, loader: t.Any, **kwargs: t.Any) -> None:
+    self.loader = loader
+
+
+def _make_trace(loader_name: str = "automodel") -> Trace:
+    return Trace(
+        started_at=datetime(2024, 1, 1),
+        ended_at=datetime(2024, 1, 1, 0, 1),
+        platform="Linux-6.1.0-x86_64",
+        run=Run(
+            loader_name=loader_name,
+            stages=[
+                Stage(name="start", timestamp=0, ram=1024, disk=2048, network={}, imports={}),
+                Stage(name="end", timestamp=1000, ram=4096, disk=4096, network={}, imports={}),
+            ],
+        ),
+        events=[],
+    )
+
+
+class TestTraceCommand:
+    @patch("dyana.cli.Tracer.__init__", _noop_tracer_init)
+    @patch("dyana.cli.Tracer.run_trace", return_value=_make_trace())
+    @patch("dyana.cli.Loader.__init__", _noop_loader_init)
+    def test_trace_runs_and_saves(self, _mock_run: t.Any, tmp_path: t.Any) -> None:
+        out = tmp_path / "trace.json"
+        result = runner.invoke(cli, ["trace", "--loader", "automodel", "--output", str(out)])
+        assert result.exit_code == 0, result.output
+        assert out.exists()
+        data = json.loads(out.read_text())
+        assert data["run"]["loader_name"] == "automodel"
+
+    @patch("dyana.cli.Tracer.__init__", _noop_tracer_init)
+    @patch(
+        "dyana.cli.Tracer.run_trace",
+        side_effect=RuntimeError(
+            "could not select device driver '' with capabilities: [[gpu]]"
+        ),
+    )
+    @patch("dyana.cli.Loader.__init__", _noop_loader_init)
+    def test_trace_gpu_error(self, _mock_run: t.Any) -> None:
+        result = runner.invoke(cli, ["trace"])
+        assert result.exit_code == 1
+        assert "--no-gpu" in _strip_ansi(result.output)
+
+    @patch("dyana.cli.Tracer.__init__", _noop_tracer_init)
+    @patch("dyana.cli.Tracer.run_trace", side_effect=RuntimeError("something broke"))
+    @patch("dyana.cli.Loader.__init__", _noop_loader_init)
+    def test_trace_generic_error(self, _mock_run: t.Any) -> None:
+        result = runner.invoke(cli, ["trace"])
+        assert result.exit_code == 1
+        assert "something broke" in _strip_ansi(result.output)
+
+
+class TestLoadersCommand:
+    @patch("dyana.cli.Loader.__init__", _noop_loader_init)
+    @patch("dyana.cli.pathlib.Path.iterdir")
+    def test_loaders_lists_available(self, mock_iterdir: t.Any) -> None:
+        fake_a = MagicMock()
+        fake_a.is_dir.return_value = True
+        fake_a.name = "automodel"
+        fake_b = MagicMock()
+        fake_b.is_dir.return_value = True
+        fake_b.name = "__pycache__"
+        fake_c = MagicMock()
+        fake_c.is_dir.return_value = True
+        fake_c.name = "base"
+        mock_iterdir.return_value = [fake_a, fake_b, fake_c]
+
+        result = runner.invoke(cli, ["loaders"])
+        assert result.exit_code == 0
+        assert "automodel" in _strip_ansi(result.output)
+
+
+class TestHelpCommand:
+    @patch("dyana.cli.view_loader_help")
+    @patch("dyana.cli.Loader.__init__", _noop_loader_init)
+    def test_help_shows_loader_info(self, mock_view: t.Any) -> None:
+        mock_view.return_value = None
+        result = runner.invoke(cli, ["help", "automodel"])
+        assert result.exit_code == 0
+        mock_view.assert_called_once()
+
+    @patch("dyana.cli.Loader.__init__", side_effect=ValueError("not found"))
+    def test_help_nonexistent_loader(self, _mock_init: t.Any) -> None:
+        result = runner.invoke(cli, ["help", "nonexistent"])
+        assert result.exit_code == 1
+        assert "not found" in _strip_ansi(result.output)

@@ -56,7 +56,4 @@
       automergeType: "pr",
     },
   ],
-  ignorePaths: [
-    "dyana/"
-  ],
 }
