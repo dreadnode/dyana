@@ -1,8 +1,14 @@
+import json
 import pathlib
 import platform as platform_pkg
 
-# NOTE: json is too slow
-import cysimdjson
+try:
+    import cysimdjson
+
+    _HAS_CYSIMDJSON = True
+except ImportError:
+    _HAS_CYSIMDJSON = False
+
 import typer
 from rich import box
 from rich import print as rich_print
@@ -147,9 +153,11 @@ def trace(
 def summary(trace_path: pathlib.Path = typer.Option(help="Path to the trace file.", default="trace.json")) -> None:
     with open(trace_path) as f:
         raw = f.read()
-        # the standard json parser is too slow for this
-        parser = cysimdjson.JSONParser()
-        trace = parser.loads(raw)
+        if _HAS_CYSIMDJSON:
+            parser = cysimdjson.JSONParser()
+            trace = parser.loads(raw)
+        else:
+            trace = json.loads(raw)
 
     is_legacy: bool = "stages" not in trace["run"]
 
