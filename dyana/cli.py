@@ -20,6 +20,7 @@ from dyana.tracer.tracee import Tracer
 from dyana.view import (
     view_disk_events,
     view_disk_usage,
+    view_extra,
     view_gpus,
     view_header,
     view_imports,
@@ -139,7 +140,9 @@ def trace(
     except Exception as e:
         serr = str(e)
         if "could not select device driver" in serr and "capabilities: [[gpu]]" in serr:
-            rich_print(":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]")
+            rich_print(
+                ":cross_mark: [bold][red]error:[/] [red]GPUs are not available on this system, run with --no-gpu.[/]"
+            )
         else:
             rich_print(f":cross_mark: [bold][red]error:[/] [red]{e}[/]")
 
@@ -187,3 +190,4 @@ def summary(trace_path: pathlib.Path = typer.Option(help="Path to the trace file
         view_legacy_extra(trace["run"])
     else:
         view_imports(trace["run"]["stages"])
+        view_extra(trace["run"])
