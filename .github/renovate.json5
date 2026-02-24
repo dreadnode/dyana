@@ -40,8 +40,31 @@
       matchPackageNames: ["python"],
       enabled: false,
     },
+    // ML framework packages get their own PRs — big jumps need manual review
     {
-      description: "Group loader dependency updates (non-major)",
+      description: "Separate torch updates (needs GPU testing)",
+      matchFileNames: ["dyana/loaders/**"],
+      matchPackageNames: ["torch"],
+      groupName: "torch",
+      groupSlug: "torch",
+    },
+    {
+      description: "Separate nvidia container updates (needs GPU testing)",
+      matchFileNames: ["dyana/loaders/**"],
+      matchPackageNames: ["nvcr.io/nvidia/pytorch"],
+      groupName: "nvidia pytorch",
+      groupSlug: "nvidia-pytorch",
+    },
+    {
+      description: "Separate transformers updates (may break loaders)",
+      matchFileNames: ["dyana/loaders/**"],
+      matchPackageNames: ["transformers"],
+      groupName: "transformers",
+      groupSlug: "transformers",
+    },
+    // Everything else in loaders grouped together and auto-merged
+    {
+      description: "Group remaining loader dependencies (non-major)",
       matchFileNames: ["dyana/loaders/**"],
       matchUpdateTypes: ["minor", "patch"],
       groupName: "loader dependencies non-major",
@@ -50,7 +73,7 @@
       automergeType: "pr",
     },
     {
-      description: "Group loader dependency updates (major)",
+      description: "Group remaining loader dependencies (major)",
       matchFileNames: ["dyana/loaders/**"],
       matchUpdateTypes: ["major"],
       groupName: "loader dependencies major",
