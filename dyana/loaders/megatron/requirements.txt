@@ -8,7 +8,7 @@ typing_extensions>=4.0.0
 
 # Megatron DMC dependencies
 flash-attn==2.6.1
-sentencepiece==0.2.0
+sentencepiece==0.2.1
 hydra-core==1.3.2
 hydra_colorlog==1.2.0
 nltk
