@@ -1,24 +1,10 @@
 import json
 import re
-import sys
 import typing as t
-from unittest.mock import MagicMock
 
-# Mock cysimdjson before importing cli (not available on macOS ARM)
-_mock_cysimdjson = MagicMock()  # noqa: E402
+from typer.testing import CliRunner
 
-
-class _FakeJSONParser:
-    def loads(self, raw: str) -> t.Any:
-        return json.loads(raw)
-
-
-_mock_cysimdjson.JSONParser = _FakeJSONParser
-sys.modules.setdefault("cysimdjson", _mock_cysimdjson)
-
-from typer.testing import CliRunner  # noqa: E402
-
-from dyana.cli import cli  # noqa: E402
+from dyana.cli import cli
 
 runner = CliRunner()
 
