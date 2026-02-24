@@ -12,6 +12,7 @@
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
   suppressNotifications: ["prIgnoreNotification"],
   rebaseWhen: "conflicted",
+  platformAutomerge: true,
   commitBodyTable: true,
   "pre-commit": {
     enabled: true,
@@ -38,6 +39,15 @@
     {
       matchPackageNames: ["python"],
       enabled: false,
+    },
+    {
+      description: "Auto merge non-major GitHub Actions updates",
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      automerge: true,
+      automergeType: "branch",
+      groupName: "github-actions non-major",
+      groupSlug: "github-actions",
     },
     {
       description: "Auto merge non-major updates",
