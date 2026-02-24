@@ -1,3 +1,4 @@
+import typing as t
 from unittest.mock import MagicMock, patch
 
 from dyana.loaders.gguf.main import (
@@ -147,31 +148,29 @@ class TestAnalyzeChatTemplate:
 class TestAnalyzeAST:
     """Tests for AST-based analysis specifically, using mocked jinja2."""
 
-    def _mock_jinja2(self):
+    def _mock_jinja2(self) -> tuple[MagicMock, MagicMock, type, type, type, type, type]:
         """Create mock jinja2 modules that simulate real AST node types."""
-        # We can't import jinja2 in dev, so mock the entire module structure
         mock_nodes = MagicMock()
         mock_sandbox = MagicMock()
 
-        # Create node type classes that isinstance() checks can match against
         class FakeNode:
             pass
 
         class FakeGetattr(FakeNode):
-            def __init__(self, attr, node=None):
+            def __init__(self, attr: str, node: t.Any = None) -> None:
                 self.attr = attr
                 self.node = node
 
         class FakeCall(FakeNode):
-            def __init__(self, callee):
+            def __init__(self, callee: t.Any) -> None:
                 self.node = callee
 
         class FakeName(FakeNode):
-            def __init__(self, name):
+            def __init__(self, name: str) -> None:
                 self.name = name
 
         class FakeFilter(FakeNode):
-            def __init__(self, name):
+            def __init__(self, name: str) -> None:
                 self.name = name
 
         mock_nodes.Node = FakeNode

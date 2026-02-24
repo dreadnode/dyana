@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import typing as t
 
 # Patterns indicating SSTI / code execution attempts in Jinja2 templates
 MALICIOUS_PATTERNS = [
@@ -134,7 +135,7 @@ def analyze_chat_template(template: str) -> dict[str, list[str]]:
     return findings
 
 
-def extract_metadata(reader: "GGUFReader") -> dict[str, str | int | float | None]:  # type: ignore[name-defined]  # noqa: F821
+def extract_metadata(reader: t.Any) -> dict[str, str | int | float | None]:
     """Extract key metadata fields from a GGUF file."""
     metadata: dict[str, str | int | float | None] = {}
 

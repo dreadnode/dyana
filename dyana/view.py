@@ -20,7 +20,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
         rich_print()
         rich_print("* **Requires Network:**", "yes" if loader.settings.network else "no")
         if loader.settings.build_args:
-            rich_print("* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()}))
+            rich_print(
+                "* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()})
+            )
 
         if loader.settings.args:
             rich_print()
@@ -34,7 +36,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
                 "|--------------|---------------------------------------------------------------------|------------------------------|----------|"
             )
             for arg in loader.settings.args:
-                rich_print(f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |")
+                rich_print(
+                    f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |"
+                )
 
         if loader.settings.examples:
             rich_print()
@@ -333,7 +337,7 @@ def view_network_events(trace: dict[str, t.Any]) -> None:
             else:
                 data = [arg["value"] for arg in event["args"] if arg["name"] == "proto_dns"][0]
                 question_names = [q["name"] for q in data["questions"]]
-                answers = [f'{a["name"]}={a["IP"]}' for a in data["answers"]]
+                answers = [f"{a['name']}={a['IP']}" for a in data["answers"]]
 
                 if not answers:
                     line = f"  * [[dim]{event['processId']}[/]] {event['processName']} | [bold red]dns[/] | question={', '.join(question_names)}"
@@ -396,6 +400,102 @@ def view_disk_events(trace: dict[str, t.Any]) -> None:
                 if count > 0:
                     rich_print(f"  * {count} accesses to {path}[dim]*[/]")
 
+        rich_print()
+
+
+def view_extra(run: dict[str, t.Any]) -> None:
+    extra = run.get("extra")
+    if not extra:
+        return
+
+    loader_name = run.get("loader_name", "")
+
+    if loader_name == "gguf":
+        _view_gguf_extra(extra)
+    else:
+        # Generic fallback for unknown extras
+        known_keys = {"imports"}
+        unknown = [k for k in extra if k not in known_keys]
+        if unknown:
+            rich_print("[bold yellow]Extra:[/]")
+            for k in unknown:
+                rich_print(f"  * {k}")
+            rich_print()
+
+
+def _view_gguf_extra(extra: dict[str, t.Any]) -> None:
+    # File structure
+    structure = extra.get("file_structure")
+    if structure:
+        rich_print("[bold yellow]File Structure:[/]")
+        rich_print(f"  Size           : {sizeof_fmt(structure.get('file_size_bytes', 0))}")
+        rich_print(f"  GGUF version   : {structure.get('version', 'unknown')}")
+        magic_ok = structure.get("magic_valid", False)
+        magic_str = "[green]valid[/]" if magic_ok else "[bold red]INVALID[/]"
+        rich_print(f"  Magic bytes    : {magic_str}")
+        rich_print()
+
+    # Model metadata
+    metadata = extra.get("metadata")
+    if metadata:
+        rich_print("[bold yellow]Model Metadata:[/]")
+        field_labels = {
+            "architecture": "Architecture",
+            "model_name": "Name",
+            "file_type": "File type",
+            "quantization_version": "Quantization",
+            "context_length": "Context length",
+            "block_count": "Block count",
+            "embedding_length": "Embedding dim",
+            "head_count": "Head count",
+            "total_metadata_fields": "Total fields",
+        }
+        for key, label in field_labels.items():
+            if key in metadata:
+                rich_print(f"  {label:<18}: {metadata[key]}")
+        rich_print()
+
+    # Template analysis
+    template_len = extra.get("chat_template_length", 0)
+    findings = extra.get("template_findings")
+    if findings:
+        errors = findings.get("errors", [])
+        warnings = findings.get("warnings", [])
+        info = findings.get("info", [])
+
+        if errors or warnings or info:
+            rich_print("[bold yellow]Chat Template Analysis:[/]")
+            rich_print(f"  Template length : {template_len} chars")
+
+            for error in errors:
+                rich_print(f"  [bold red]ERROR[/]    : {error}")
+            for warning in warnings:
+                rich_print(f"  [bold yellow]WARNING[/]  : {warning}")
+            for item in info:
+                rich_print(f"  [dim]INFO[/]     : {item}")
+            rich_print()
+        elif template_len > 0:
+            rich_print("[bold yellow]Chat Template Analysis:[/]")
+            rich_print(f"  Template length : {template_len} chars")
+            rich_print("  [green]No security issues found[/]")
+            rich_print()
+        else:
+            rich_print("[bold yellow]Chat Template Analysis:[/]")
+            rich_print("  [dim]No chat template present[/]")
+            rich_print()
+
+    # Tensor summary
+    tensor_count = extra.get("tensor_count")
+    if tensor_count is not None:
+        rich_print("[bold yellow]Tensors:[/]")
+        rich_print(f"  Total tensors  : {tensor_count}")
+        sample = extra.get("tensor_sample", [])
+        if sample:
+            for tensor in sample[:10]:
+                shape_str = "x".join(str(d) for d in tensor.get("shape", []))
+                rich_print(f"  * [dim]{tensor.get('name', '?')}[/] [{shape_str}] {tensor.get('type', '')}")
+            if tensor_count > 10:
+                rich_print(f"  [dim]... and {tensor_count - 10} more[/]")
         rich_print()
 
 
