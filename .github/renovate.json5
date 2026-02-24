@@ -41,6 +41,22 @@
       enabled: false,
     },
     {
+      description: "Group loader dependency updates (non-major)",
+      matchFileNames: ["dyana/loaders/**"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "loader dependencies non-major",
+      groupSlug: "loader-deps",
+      automerge: true,
+      automergeType: "pr",
+    },
+    {
+      description: "Group loader dependency updates (major)",
+      matchFileNames: ["dyana/loaders/**"],
+      matchUpdateTypes: ["major"],
+      groupName: "loader dependencies major",
+      groupSlug: "loader-deps-major",
+    },
+    {
       description: "Auto merge non-major GitHub Actions updates",
       matchManagers: ["github-actions"],
       matchUpdateTypes: ["minor", "patch", "digest"],
