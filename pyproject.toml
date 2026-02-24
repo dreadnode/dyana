@@ -16,8 +16,11 @@ typer = "^0.16.0"
 pydantic = "^2.9.2"
 docker = "^7.1.0"
 rich = "^14.0.0"
-cysimdjson = "24.12"
+cysimdjson = {version = "24.12", optional = true}
 pydantic-yaml = "^1.4.0"
+
+[tool.poetry.extras]
+fast-json = ["cysimdjson"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

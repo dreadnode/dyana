@@ -196,9 +196,10 @@ markers = {main = "platform_system == \"Windows\"", dev = "sys_platform == \"win
 name = "cysimdjson"
 version = "24.12"
 description = "High-speed JSON parser"
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
+markers = "extra == \"fast-json\""
 files = [
     {file = "cysimdjson-24.12-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4f1bca0c3a1b4be798266565b951fad85d38c386605af63928cda02ac28155cc"},
     {file = "cysimdjson-24.12-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7d8c66262e6905a7c05c9663f5ef1176db292c4cf3091509ece2f4fee0218573"},
@@ -1218,7 +1219,10 @@ platformdirs = ">=3.9.1,<5"
 docs = ["furo (>=2023.7.26)", "proselint (>=0.13)", "sphinx (>=7.1.2,!=7.3)", "sphinx-argparse (>=0.4)", "sphinxcontrib-towncrier (>=0.2.1a0)", "towncrier (>=23.6)"]
 test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7)", "packaging (>=23.1)", "pytest (>=7.4)", "pytest-env (>=0.8.2)", "pytest-freezer (>=0.4.8) ; platform_python_implementation == \"PyPy\" or platform_python_implementation == \"CPython\" and sys_platform == \"win32\" and python_version >= \"3.13\"", "pytest-mock (>=3.11.1)", "pytest-randomly (>=3.12)", "pytest-timeout (>=2.1)", "setuptools (>=68)", "time-machine (>=2.10) ; platform_python_implementation == \"CPython\""]
 
+[extras]
+fast-json = ["cysimdjson"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "af45499c1aeee878ff47b72adea5ebab1367cb96cfb5ec6c2dbfabe93378a694"
+content-hash = "d5d02b620ded896caf93c92d1a16a9d44ad40f48096ef1efeac7d4aa58734eed"
