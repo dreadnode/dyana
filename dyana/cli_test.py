@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import typing as t
 from unittest.mock import MagicMock
@@ -21,33 +22,40 @@ from dyana.cli import cli  # noqa: E402
 
 runner = CliRunner()
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
 
 class TestCLIHelp:
     def test_help(self) -> None:
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "Blackbox profiler" in result.output
+        assert "Blackbox profiler" in _strip_ansi(result.output)
 
     def test_trace_help(self) -> None:
         result = runner.invoke(cli, ["trace", "--help"])
         assert result.exit_code == 0
-        assert "--loader" in result.output
-        assert "--timeout" in result.output
+        output = _strip_ansi(result.output)
+        assert "--loader" in output
+        assert "--timeout" in output
 
     def test_summary_help(self) -> None:
         result = runner.invoke(cli, ["summary", "--help"])
         assert result.exit_code == 0
-        assert "--trace-path" in result.output
+        assert "--trace-path" in _strip_ansi(result.output)
 
     def test_help_command_help(self) -> None:
         result = runner.invoke(cli, ["help", "--help"])
         assert result.exit_code == 0
-        assert "LOADER" in result.output
+        assert "LOADER" in _strip_ansi(result.output)
 
     def test_loaders_help(self) -> None:
         result = runner.invoke(cli, ["loaders", "--help"])
         assert result.exit_code == 0
-        assert "--build" in result.output
+        assert "--build" in _strip_ansi(result.output)
 
 
 class TestSummaryCommand:
