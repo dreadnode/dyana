@@ -5,6 +5,7 @@ from dyana.view import (
     severity_fmt,
     view_disk_events,
     view_disk_usage,
+    view_extra,
     view_header,
     view_network_events,
     view_process_executions,
@@ -284,9 +285,7 @@ class TestViewNetworkEvents:
             "processId": 1,
             "processName": "curl",
             "syscall": "connect",
-            "args": [
-                {"name": "remote_addr", "value": {"sa_family": "AF_INET", "sin_addr": "1.2.3.4", "sin_port": 80}}
-            ],
+            "args": [{"name": "remote_addr", "value": {"sa_family": "AF_INET", "sin_addr": "1.2.3.4", "sin_port": 80}}],
         }
         trace: dict[str, t.Any] = {"events": [event, {**event, "timestamp": 2000}]}
         with patch("dyana.view.rich_print") as mock_print:
@@ -434,3 +433,101 @@ class TestViewDiskUsage:
             assert "Disk Usage" in output
             assert "start" in output
             assert "end" in output
+
+
+class TestViewExtra:
+    def test_no_extra(self) -> None:
+        run: dict[str, t.Any] = {"extra": None, "loader_name": "safetensors"}
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
+
+    def test_empty_extra(self) -> None:
+        run: dict[str, t.Any] = {"extra": {}, "loader_name": "safetensors"}
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
+
+    def test_safetensors_file_structure(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "safetensors",
+            "extra": {
+                "file_structure": {
+                    "header_length": 256,
+                    "file_size": 1048576,
+                    "data_section_size": 1048312,
+                    "header_valid": True,
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "File Structure" in output
+            assert "Header length" in output
+            assert "yes" in output
+
+    def test_safetensors_tensor_summary(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "safetensors",
+            "extra": {
+                "tensor_summary": {
+                    "count": 42,
+                    "total_data_bytes": 1048576,
+                    "dtype_distribution": {"F32": 30, "F16": 12},
+                    "sample_tensors": [
+                        {"name": "layer.0.weight", "dtype": "F32", "shape": [768, 768]},
+                    ],
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Tensor Summary" in output
+            assert "42" in output
+            assert "F32" in output
+            assert "layer.0.weight" in output
+            assert "768x768" in output
+
+    def test_safetensors_findings(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "safetensors",
+            "extra": {
+                "findings": {
+                    "errors": ["overlapping tensors"],
+                    "warnings": ["size mismatch"],
+                    "info": ["gap detected"],
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "ERROR" in output
+            assert "overlapping tensors" in output
+            assert "WARNING" in output
+            assert "size mismatch" in output
+            assert "INFO" in output
+            assert "gap detected" in output
+
+    def test_safetensors_metadata(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "safetensors",
+            "extra": {"metadata": {"format": "pt", "framework": "pytorch"}},
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Metadata" in output
+            assert "format" in output
+            assert "pytorch" in output
+
+    def test_unknown_loader_no_output(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "unknown_loader",
+            "extra": {"some_key": "some_value"},
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()

@@ -20,7 +20,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
         rich_print()
         rich_print("* **Requires Network:**", "yes" if loader.settings.network else "no")
         if loader.settings.build_args:
-            rich_print("* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()}))
+            rich_print(
+                "* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()})
+            )
 
         if loader.settings.args:
             rich_print()
@@ -34,7 +36,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
                 "|--------------|---------------------------------------------------------------------|------------------------------|----------|"
             )
             for arg in loader.settings.args:
-                rich_print(f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |")
+                rich_print(
+                    f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |"
+                )
 
         if loader.settings.examples:
             rich_print()
@@ -333,7 +337,7 @@ def view_network_events(trace: dict[str, t.Any]) -> None:
             else:
                 data = [arg["value"] for arg in event["args"] if arg["name"] == "proto_dns"][0]
                 question_names = [q["name"] for q in data["questions"]]
-                answers = [f'{a["name"]}={a["IP"]}' for a in data["answers"]]
+                answers = [f"{a['name']}={a['IP']}" for a in data["answers"]]
 
                 if not answers:
                     line = f"  * [[dim]{event['processId']}[/]] {event['processName']} | [bold red]dns[/] | question={', '.join(question_names)}"
@@ -422,3 +426,65 @@ def view_security_events(trace: dict[str, t.Any]) -> None:
             rich_print(f"  * {signature} ([dim]{category}[/], {severity_fmt(severity_level)})")
 
         rich_print()
+
+
+def _view_safetensors_extra(extra: dict[str, t.Any]) -> None:
+    file_structure = extra.get("file_structure")
+    if file_structure:
+        rich_print("[bold yellow]File Structure:[/]")
+        rich_print(f"  Header length  : {sizeof_fmt(file_structure['header_length'])}")
+        rich_print(f"  File size      : {sizeof_fmt(file_structure['file_size'])}")
+        rich_print(f"  Data section   : {sizeof_fmt(file_structure['data_section_size'])}")
+        valid_str = "[green]yes[/]" if file_structure["header_valid"] else "[red]no[/]"
+        rich_print(f"  Header valid   : {valid_str}")
+        rich_print()
+
+    tensor_summary = extra.get("tensor_summary")
+    if tensor_summary:
+        rich_print("[bold yellow]Tensor Summary:[/]")
+        rich_print(f"  Count          : {tensor_summary['count']}")
+        rich_print(f"  Total data     : {sizeof_fmt(tensor_summary['total_data_bytes'])}")
+        if tensor_summary["dtype_distribution"]:
+            dist = ", ".join(
+                f"{dtype}: {count}" for dtype, count in sorted(tensor_summary["dtype_distribution"].items())
+            )
+            rich_print(f"  Dtypes         : {dist}")
+        rich_print()
+
+        if tensor_summary.get("sample_tensors"):
+            rich_print("[bold yellow]Sample Tensors:[/]")
+            for tensor in tensor_summary["sample_tensors"]:
+                shape_str = "x".join(str(s) for s in tensor["shape"])
+                rich_print(f"  * [green]{tensor['name']}[/] : {tensor['dtype']} [{shape_str}]")
+            rich_print()
+
+    metadata = extra.get("metadata")
+    if metadata:
+        rich_print("[bold yellow]Metadata:[/]")
+        for key, value in metadata.items():
+            display_value = value if len(str(value)) <= 80 else str(value)[:77] + "..."
+            rich_print(f"  * [green]{key}[/] : {display_value}")
+        rich_print()
+
+    findings = extra.get("findings")
+    if findings:
+        has_any = findings.get("errors") or findings.get("warnings") or findings.get("info")
+        if has_any:
+            rich_print("[bold yellow]Findings:[/]")
+            for error in findings.get("errors", []):
+                rich_print(f"  * [bold red]ERROR[/]   : {error}")
+            for warning in findings.get("warnings", []):
+                rich_print(f"  * [yellow]WARNING[/] : {warning}")
+            for info_msg in findings.get("info", []):
+                rich_print(f"  * [dim]INFO[/]    : {info_msg}")
+            rich_print()
+
+
+def view_extra(run: dict[str, t.Any]) -> None:
+    extra = run.get("extra")
+    if not extra:
+        return
+
+    loader_name = run.get("loader_name", "")
+    if loader_name == "safetensors":
+        _view_safetensors_extra(extra)
