@@ -1,4 +1,4 @@
-FROM python:3.12-bookworm AS builder
+FROM python:3.14-bookworm AS builder
 
 RUN pip install poetry==1.8.3
 
@@ -13,7 +13,7 @@ COPY pyproject.toml poetry.lock README.md ./
 
 RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
 
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 
 # install requirements to use docker from within docker
 RUN apt-get update && apt-get install -y libssl-dev curl ca-certificates
