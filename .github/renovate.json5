@@ -36,10 +36,9 @@
       separateMinorPatch: true,
     },
     {
-      matchManagers: ["poetry", "pip_requirements"],
-      matchDepTypes: ["python"],
-      allowedVersions: "^3.10",
-      enabled: true,
+      matchPackageNames: ["python"],
+      matchManagers: ["poetry"],
+      enabled: false,
     },
     {
       description: "Auto merge non-major updates",
