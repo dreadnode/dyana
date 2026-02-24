@@ -8,30 +8,42 @@ from docker.models.images import Image
 from rich import print as rich_print
 
 DOCKER_SOCKET_PATH = "/var/run/docker.sock"
-DOCKER_SOCKET_EXISTS = os.path.exists(DOCKER_SOCKET_PATH)
 COLIMA_SOCKET_PATH = os.path.expanduser("~/.colima/docker.sock")
-COLIMA_SOCKET_EXISTS = os.path.exists(COLIMA_SOCKET_PATH)
+
+_client: docker.DockerClient | None = None
+_client_initialized = False
 
 
-try:
-    client = docker.from_env()
-except docker.errors.DockerException:
-    # check if Colima exists
-    if COLIMA_SOCKET_EXISTS:
-        # https://github.com/abiosoft/colima/issues/468
-        try:
-            client = docker.DockerClient(base_url="unix://" + COLIMA_SOCKET_PATH)
-            rich_print(f":whale: [bold]docker[/]: found {COLIMA_SOCKET_PATH}, using colima runtime")
-        except docker.errors.DockerException:
-            client = None
-    else:
-        client = None
+def _get_client() -> docker.DockerClient | None:
+    global _client, _client_initialized
+    if _client_initialized:
+        return _client
+
+    _client_initialized = True
+
+    colima_socket_exists = os.path.exists(COLIMA_SOCKET_PATH)
+
+    try:
+        _client = docker.from_env()
+    except docker.errors.DockerException:
+        if colima_socket_exists:
+            # https://github.com/abiosoft/colima/issues/468
+            try:
+                _client = docker.DockerClient(base_url="unix://" + COLIMA_SOCKET_PATH)
+                rich_print(f":whale: [bold]docker[/]: found {COLIMA_SOCKET_PATH}, using colima runtime")
+            except docker.errors.DockerException:
+                _client = None
+        else:
+            _client = None
+
+    return _client
 
 
 def _raise_docker_exception() -> None:
     msg: str = ""
     docker_in_path: bool = shutil.which("docker") is not None
-    if not DOCKER_SOCKET_EXISTS and not docker_in_path:
+    docker_socket_exists = os.path.exists(DOCKER_SOCKET_PATH)
+    if not docker_socket_exists and not docker_in_path:
         msg = "docker is not installed"
     else:
         # the docker binary is in $PATH and/or the socket exists
@@ -40,9 +52,11 @@ def _raise_docker_exception() -> None:
     raise Exception(msg)
 
 
-def _ensure_docker_client() -> None:
+def _ensure_docker_client() -> docker.DockerClient:
+    client = _get_client()
     if client is None:
         _raise_docker_exception()
+    return client
 
 
 def sanitized_agent_name(name: str) -> str:
@@ -70,7 +84,7 @@ def build(
     force_rebuild: bool = False,
     verbose: bool = False,
 ) -> Image:
-    _ensure_docker_client()
+    client = _ensure_docker_client()
 
     norm_name = sanitized_agent_name(name)
     if norm_name != name:
@@ -105,9 +119,7 @@ def build(
 
 
 def pull(image: str) -> Image:
-    if client is None:
-        raise Exception("Docker not available")
-
+    client = _ensure_docker_client()
     return client.images.pull(image)
 
 
@@ -121,7 +133,7 @@ def run_detached(
     allow_volume_write: bool = False,
     mem_limit: str = "100m",
 ) -> docker.models.containers.Container:
-    _ensure_docker_client()
+    client = _ensure_docker_client()
 
     # by default network is disabled
     network_mode = "bridge" if allow_network else "none"
@@ -182,7 +194,7 @@ def run_privileged_detached(
     entrypoint: str | None = None,
     environment: dict[str, str] | None = None,
 ) -> docker.models.containers.Container:
-    _ensure_docker_client()
+    client = _ensure_docker_client()
 
     return client.containers.run(
         image,

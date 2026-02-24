@@ -12,6 +12,7 @@ from rich import print as rich_print
 
 import dyana
 import dyana.docker as docker
+from dyana.constants import SECURITY_EVENTS
 from dyana.loaders.loader import Loader, Run
 
 
@@ -29,46 +30,7 @@ class Trace(BaseModel):
 class Tracer:
     DOCKER_IMAGE = "aquasec/tracee:latest"
 
-    SECURITY_EVENTS: list[str] = [
-        # cd tracee/signatures/go && grep -r "EventName:" --exclude="*_test.go" * | cut -d'"' -f2 | sort -u
-        "anti_debugging",
-        "aslr_inspection",
-        "cgroup_notify_on_release",
-        "cgroup_release_agent",
-        "core_pattern_modification",
-        "default_loader_mod",
-        "disk_mount",
-        "docker_abuse",
-        "dropped_executable",
-        "dynamic_code_loading",
-        "fileless_execution",
-        "hidden_file_created",
-        "illegitimate_shell",
-        "k8s_api_connection",
-        "k8s_cert_theft",
-        # Error: invalid event to trace: k8s_service_account_token
-        # "k8s_service_account_token",
-        "kernel_module_loading",
-        "ld_preload",
-        "proc_fops_hooking",
-        "proc_kcore_read",
-        "proc_mem_access",
-        "proc_mem_code_injection",
-        "process_vm_write_inject",
-        "ptrace_code_injection",
-        "rcd_modification",
-        "sched_debug_recon",
-        "scheduled_task_mod",
-        "stdio_over_socket",
-        "sudoers_modification",
-        "syscall_hooking",
-        "system_request_key_mod",
-        # non signature related but still security related
-        "hidden_kernel_module",
-        "bpf_attach",
-        "ftrace_hook",
-        "hooked_syscall",
-    ]
+    SECURITY_EVENTS: list[str] = SECURITY_EVENTS
 
     DEFAULT_EVENTS: list[str] = [
         "security_file_open",
@@ -169,8 +131,6 @@ class Tracer:
                 elif "KERNEL_RELEASE" in message:
                     self.tracee_kernel_release = message["KERNEL_RELEASE"]
             else:
-                # other messages
-                # print(f":eye_in_speech_bubble:  [bold]tracer[/]: {message['M'].strip()}")
                 pass
 
         elif "level" in message:

@@ -122,8 +122,6 @@ class Loader:
                 rich_print(
                     f":whale: [bold]loader[/]: using image [green]{self.image.tags[0]}[/] [dim]({self.image.id})[/] ({self.platform})"
                 )
-            # else:
-            # print(f":whale: [bold]loader[/]: using image [green]{self.image.tags[0]}[/] [dim]({self.image.id})[/]")
 
     def _reader_thread(self) -> None:
         if not self.container:
