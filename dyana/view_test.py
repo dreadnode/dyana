@@ -284,9 +284,7 @@ class TestViewNetworkEvents:
             "processId": 1,
             "processName": "curl",
             "syscall": "connect",
-            "args": [
-                {"name": "remote_addr", "value": {"sa_family": "AF_INET", "sin_addr": "1.2.3.4", "sin_port": 80}}
-            ],
+            "args": [{"name": "remote_addr", "value": {"sa_family": "AF_INET", "sin_addr": "1.2.3.4", "sin_port": 80}}],
         }
         trace: dict[str, t.Any] = {"events": [event, {**event, "timestamp": 2000}]}
         with patch("dyana.view.rich_print") as mock_print:

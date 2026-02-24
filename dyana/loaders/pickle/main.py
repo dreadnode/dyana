@@ -1,12 +1,37 @@
+from __future__ import annotations
+
 import argparse
 import os
 import pickle
 import subprocess
 import sys
+import typing as t
 
-from dyana import Profiler  # type: ignore[attr-defined]
+
+def inspect_object(data: t.Any) -> dict[str, t.Any]:
+    """Inspect a deserialized object and return its properties."""
+    result: dict[str, t.Any] = {
+        "object_type": str(type(data)),
+    }
+
+    if hasattr(data, "__dict__"):
+        result["object_attributes"] = list(data.__dict__.keys())
+
+    if hasattr(data, "shape"):
+        result["shape"] = str(data.shape)
+
+    if hasattr(data, "__len__"):
+        try:
+            result["length"] = len(data)
+        except Exception:
+            pass
+
+    return result
+
 
 if __name__ == "__main__":
+    from dyana import Profiler  # type: ignore[attr-defined]
+
     parser = argparse.ArgumentParser(description="Run a Python pickle file")
     parser.add_argument("--pickle", help="Path to pickle file", required=True)
     parser.add_argument("--extra-requirements", help="Extra pip requirements", default="")
@@ -23,7 +48,9 @@ if __name__ == "__main__":
                 if req:
                     print(f"Installing dependency: {req}")
                     result = subprocess.run(
-                        [sys.executable, "-m", "pip", "install", "--no-cache-dir", req], capture_output=True, text=True
+                        [sys.executable, "-m", "pip", "install", "--no-cache-dir", req],
+                        capture_output=True,
+                        text=True,
                     )
                     if result.returncode != 0:
                         profiler.track_warning("dependencies", f"Failed to install {req}: {result.stderr}")
@@ -42,20 +69,9 @@ if __name__ == "__main__":
                 data = pickle.load(f)
                 profiler.on_stage("after_load")
 
-                # Try to get attributes of the loaded object
-                if hasattr(data, "__dict__"):
-                    profiler.track_extra("object_attributes", list(data.__dict__.keys()))
-
-                # Try to get the type
-                profiler.track_extra("object_type", str(type(data)))
-
-                # Try to get the shape for numpy arrays or tensors
-                if hasattr(data, "shape"):
-                    profiler.track_extra("shape", str(data.shape))
-
-                # Try to get the length for lists, tuples, dicts
-                if hasattr(data, "__len__"):
-                    profiler.track_extra("length", len(data))
+                info = inspect_object(data)
+                for key, value in info.items():
+                    profiler.track_extra(key, value)
         except ImportError as e:
             profiler.track_error("pickle", str(e))
         except Exception as e:

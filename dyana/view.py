@@ -20,7 +20,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
         rich_print()
         rich_print("* **Requires Network:**", "yes" if loader.settings.network else "no")
         if loader.settings.build_args:
-            rich_print("* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()}))
+            rich_print(
+                "* **Optional Build Arguments:**", ", ".join({f"`--{k}`" for k in loader.settings.build_args.keys()})
+            )
 
         if loader.settings.args:
             rich_print()
@@ -34,7 +36,9 @@ def _view_loader_help_markdown(loader: Loader) -> None:
                 "|--------------|---------------------------------------------------------------------|------------------------------|----------|"
             )
             for arg in loader.settings.args:
-                rich_print(f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |")
+                rich_print(
+                    f"| `--{arg.name}` | {arg.description} | `{arg.default}` | {'yes' if arg.required else 'no'} |"
+                )
 
         if loader.settings.examples:
             rich_print()
@@ -333,7 +337,7 @@ def view_network_events(trace: dict[str, t.Any]) -> None:
             else:
                 data = [arg["value"] for arg in event["args"] if arg["name"] == "proto_dns"][0]
                 question_names = [q["name"] for q in data["questions"]]
-                answers = [f'{a["name"]}={a["IP"]}' for a in data["answers"]]
+                answers = [f"{a['name']}={a['IP']}" for a in data["answers"]]
 
                 if not answers:
                     line = f"  * [[dim]{event['processId']}[/]] {event['processName']} | [bold red]dns[/] | question={', '.join(question_names)}"
