@@ -1,0 +1,68 @@
+site_name: Dyana
+site_description: Sandbox and profiling docs for Dyana.
+site_author: Dreadnode
+site_url: https://dreadnode.github.io/dyana/
+repo_url: https://github.com/dreadnode/dyana
+
+nav:
+  - Home:
+      - Overview: index.md
+      - Install: install.md
+      - Basic Usage: basic-usage.md
+  - Topics:
+      - Loaders: topics/loaders.md
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tabs
+    - navigation.tabs.sticky
+
+plugins:
+  - search
+  - section-index
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: "#"
+
+extra:
+  homepage: https://dreadnode.io
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dreadnode
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/dreadnode
