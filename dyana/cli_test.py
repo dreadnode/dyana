@@ -4,6 +4,7 @@ import typing as t
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from dyana.cli import cli
@@ -192,6 +193,34 @@ class TestTraceCommand:
         result = runner.invoke(cli, ["trace"])
         assert result.exit_code == 1
         assert "something broke" in _strip_ansi(result.output)
+
+    def test_trace_rejects_missing_policy(self, tmp_path: t.Any) -> None:
+        missing = tmp_path / "missing-policy.yml"
+        result = runner.invoke(cli, ["trace", "--policy", str(missing)])
+        assert result.exit_code == 1
+        assert "policy file or directory not found" in _strip_ansi(result.output)
+
+    def test_trace_disables_gpu_on_non_linux(self, tmp_path: t.Any) -> None:
+        out = tmp_path / "trace.json"
+        with (
+            patch("dyana.cli.platform_pkg.system", return_value="Darwin"),
+            patch("dyana.cli.Tracer.__init__", _noop_tracer_init),
+            patch("dyana.cli.Tracer.run_trace", return_value=_make_trace()) as mock_run_trace,
+            patch("dyana.cli.Loader.__init__", _noop_loader_init),
+        ):
+            result = runner.invoke(cli, ["trace", "--output", str(out)])
+        assert result.exit_code == 0, result.output
+        assert mock_run_trace.call_args.args == (False, False, False)
+
+    def test_trace_verbose_reraises(self) -> None:
+        with (
+            patch("dyana.cli.platform_pkg.system", return_value="Linux"),
+            patch("dyana.cli.Tracer.__init__", _noop_tracer_init),
+            patch("dyana.cli.Tracer.run_trace", side_effect=RuntimeError("explode")),
+            patch("dyana.cli.Loader.__init__", _noop_loader_init),
+        ):
+            with pytest.raises(RuntimeError, match="explode"):
+                runner.invoke(cli, ["trace", "--verbose"], catch_exceptions=False)
 
 
 class TestLoadersCommand:

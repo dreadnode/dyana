@@ -1,5 +1,6 @@
 import argparse
 import os
+from typing import Any
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -80,9 +81,10 @@ if __name__ == "__main__":
             # continue execution to capture any partial data
 
         if args.performance_log:
-            network_logs = driver.get_log("performance")
+            driver_with_logs: Any = driver
+            network_logs = driver_with_logs.get_log("performance")
             profiler.track_extra("network_logs", network_logs)
-            browser_logs = driver.get_log("browser")
+            browser_logs = driver_with_logs.get_log("browser")
             profiler.track_extra("browser_logs", browser_logs)
 
         profiler.on_stage("after_load")
