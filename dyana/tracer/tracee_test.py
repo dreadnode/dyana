@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 from dyana.constants import SECURITY_EVENTS
 from dyana.tracer.tracee import Trace, Tracer
@@ -99,3 +100,38 @@ class TestOnTracerEvent:
         tracer._on_tracer_event("   \n")
         assert len(tracer.trace) == 0
         assert tracer.reader_error is None
+
+
+class TestTracerRunTrace:
+    def test_filters_events_and_merges_tracer_errors(self) -> None:
+        from dyana.loaders.loader import Run
+
+        tracer = Tracer.__new__(Tracer)
+        tracer.errors = ["tracee failed once"]
+        tracer.trace = [
+            {"eventName": "sched_process_exec", "containerId": "ABC123"},
+            {"eventName": "sched_process_exec", "containerId": "different"},
+            {"eventName": "sched_process_exec", "containerId": None},
+        ]
+        tracer.tracee_version = "tracee:latest@sha256:deadbeef"
+        tracer.tracee_kernel_release = "6.8.0"
+        tracer.loader = MagicMock()
+        tracer.loader.container_id = "abc123"
+        tracer.loader.run.return_value = Run(loader_name="loader-under-test", errors={"loader": "boom"})
+
+        with (
+            patch.object(tracer, "_start") as mock_start,
+            patch.object(tracer, "_stop") as mock_stop,
+            patch("dyana.tracer.tracee.platform.platform", return_value="Linux-test"),
+            patch("dyana.tracer.tracee.dyana.__version__", "0.1.4"),
+        ):
+            trace = tracer.run_trace(allow_network=True, allow_gpus=False, allow_volume_write=True)
+
+        mock_start.assert_called_once_with()
+        mock_stop.assert_called_once_with()
+        tracer.loader.run.assert_called_once_with(True, False, True)
+        assert trace.platform == "Linux-test"
+        assert trace.tracee_version == "tracee:latest@sha256:deadbeef"
+        assert trace.tracee_kernel_release == "6.8.0"
+        assert trace.run.errors == {"loader": "boom", "tracer": "tracee failed once"}
+        assert trace.events == [{"eventName": "sched_process_exec", "containerId": "ABC123"}]
