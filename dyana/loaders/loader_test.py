@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from dyana.loaders.loader import Loader, Run
@@ -85,7 +87,7 @@ class _FakeContainer:
 
 
 class TestLoaderRun:
-    def _make_loader(self, tmp_path: pytest.TempPathFactory) -> Loader:
+    def _make_loader(self, tmp_path: Path) -> Loader:
         loader = Loader.__new__(Loader)
         loader.name = "test-loader"
         loader.image = "image-id"
@@ -112,7 +114,7 @@ class TestLoaderRun:
         ]
         return loader
 
-    def test_run_parses_profile_and_merges_extra_stdout(self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_run_parses_profile_and_merges_extra_stdout(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         loader = self._make_loader(tmp_path)
         model_dir = tmp_path / "ModelDir"
         model_dir.mkdir()
@@ -132,7 +134,9 @@ class TestLoaderRun:
         monkeypatch.setattr("dyana.loaders.loader.threading.Thread", lambda target: _FakeThread(on_start=_set_output))
         monkeypatch.setattr("dyana.loaders.loader.time.sleep", lambda _: None)
         monkeypatch.setattr("dyana.loaders.loader.docker.run_detached", lambda *args, **kwargs: container)
-        monkeypatch.setattr("dyana.loaders.loader.os.path.expanduser", lambda path: str(shared_dir) if path == "~/shared" else path)
+        monkeypatch.setattr(
+            "dyana.loaders.loader.os.path.expanduser", lambda path: str(shared_dir) if path == "~/shared" else path
+        )
 
         run = loader.run(allow_network=False, allow_gpus=True, allow_volume_write=False)
 
@@ -149,7 +153,7 @@ class TestLoaderRun:
         assert run.stderr == "warn"
         assert loader.container_id == "abc123"
 
-    def test_run_times_out_and_kills_container(self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_run_times_out_and_kills_container(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from datetime import datetime
 
         loader = self._make_loader(tmp_path)
@@ -180,7 +184,7 @@ class TestLoaderRun:
         assert run.errors == {"timeout": "timeout reached, killing container"}
         assert container.killed is True
 
-    def test_run_handles_container_error(self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_run_handles_container_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         import docker as docker_pkg
 
         loader = self._make_loader(tmp_path)
@@ -194,7 +198,9 @@ class TestLoaderRun:
             image="image",
             stderr=b"container failed",
         )
-        monkeypatch.setattr("dyana.loaders.loader.docker.run_detached", lambda *args, **kwargs: (_ for _ in ()).throw(error))
+        monkeypatch.setattr(
+            "dyana.loaders.loader.docker.run_detached", lambda *args, **kwargs: (_ for _ in ()).throw(error)
+        )
 
         run = loader.run()
 
