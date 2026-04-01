@@ -1,54 +1,59 @@
-[tool.poetry]
-authors = [
-    "Simone Margaritelli <simone@dreadnode.io>",
-    "Ads Dawson <ads@dreadnode.io>",
-]
+[project]
 name = "dyana"
 version = "0.1.4"
 description = "A sandbox environment based on Docker and eBPF to load and profile a wide range of file types."
-license = "MIT"
-repository = "https://github.com/dreadnode/dyana"
 readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Simone Margaritelli", email = "simone@dreadnode.io" },
+    { name = "Ads Dawson", email = "ads@dreadnode.io" },
+]
+dependencies = [
+    "typer>=0.16.0,<0.17",
+    "pydantic>=2.9.2,<3",
+    "docker>=7.1.0,<8",
+    "rich>=14.0.0,<15",
+    "pydantic-yaml>=1.4.0,<2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-typer = "^0.16.0"
-pydantic = "^2.9.2"
-docker = "^7.1.0"
-rich = "^14.0.0"
-cysimdjson = {version = "24.12", optional = true}
-pydantic-yaml = "^1.4.0"
+[project.urls]
+Repository = "https://github.com/dreadnode/dyana"
 
-[tool.poetry.extras]
-fast-json = ["cysimdjson"]
+[project.optional-dependencies]
+fast-json = ["cysimdjson==24.12; platform_system == 'Linux' and platform_machine == 'x86_64'"]
+
+[project.scripts]
+dyana = "dyana.__main__:run"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.8.0,<2",
+    "ruff>=0.15.0,<0.16",
+    "pre-commit>=4.0.0,<5",
+    "pytest>=9.0.0,<10",
+    "pytest-asyncio>=1.0.0,<2",
+]
+docs = [
+    "mkdocs>=1.6.1,<2",
+    "mkdocs-material>=9.6.1,<10",
+    "mkdocs-section-index>=0.3.9,<0.4",
+    "pymdown-extensions>=10.15,<11",
+]
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dyana"]
+
+[tool.uv]
+exclude-newer = "3 days"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.8.0"
-ruff = "^0.15.0"
-pre-commit = "^4.0.0"
-pytest = "^9.0.0"
-pytest-asyncio = "^1.0.0"
-
-[tool.poetry.group.docs.dependencies]
-mkdocs = "^1.6.1"
-mkdocs-material = "^9.6.1"
-mkdocs-section-index = "^0.3.9"
-pymdown-extensions = "^10.15"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-
-[tool.poetry.scripts]
-dyana = 'dyana.__main__:run'
-
-[tool.poetry.plugins."pipx.run"]
-dyana = 'dyana.__main__:run'
 
 [tool.mypy]
 strict = true
@@ -75,24 +80,24 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "C",   # flake8-comprehensions
-    "B",   # flake8-bugbear
-    "UP",  # pyupgrade
-    "NPY", # numpydoc
-    "A",   # flake8-annotations
+    "E",
+    "W",
+    "F",
+    "I",
+    "C",
+    "B",
+    "UP",
+    "NPY",
+    "A",
 ]
 ignore = [
-    "E501", # line too long, handled by ruff
-    "B008", # do not perform function calls in argument defaults
-    "C901", # too complex
-    "W191", # indentation contains tabs
-    "F722", # syntax error in forward annotation
-    "A001", # shadowing built-in
-    "A002", # shadowing built-in
+    "E501",
+    "B008",
+    "C901",
+    "W191",
+    "F722",
+    "A001",
+    "A002",
 ]
 fixable = ["ALL"]
 unfixable = ["B"]

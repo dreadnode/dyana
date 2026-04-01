@@ -10,6 +10,7 @@
     ":automergeBranch",
   ],
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
+  minimumReleaseAge: "3 days",
   suppressNotifications: ["prIgnoreNotification"],
   rebaseWhen: "conflicted",
   platformAutomerge: true,
@@ -17,7 +18,10 @@
   "pre-commit": {
     enabled: true,
   },
-  poetry: {
+  pep621: {
+    fileMatch: ["pyproject.toml"],
+  },
+  uv: {
     fileMatch: ["pyproject.toml"],
   },
   pip_requirements: {
@@ -30,7 +34,7 @@
   },
   packageRules: [
     {
-      matchManagers: ["poetry", "pip_requirements"],
+      matchManagers: ["pep621", "uv", "pip_requirements"],
       matchPackagePatterns: ["^pytest"],
       groupName: "pytest packages",
       groupSlug: "pytest",

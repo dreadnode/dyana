@@ -23,30 +23,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@b8f6fe29ba2eb78e0d45ccbf41cd14154c4e25b2
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
-
-      - name: Cache dependencies
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
         with:
-          path: ./.venv
-          key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-          restore-keys: |
-            venv-${{ runner.os }}-py${{ matrix.python-version }}-
+          enable-cache: true
 
       - name: Install package
-        run: poetry install --all-extras
-        
+        run: uv sync --all-extras --group dev
+
       - name: Lint
-        run: poetry run ruff check --output-format=github dyana
+        run: uv run ruff check --output-format=github dyana
 
       - name: Type check
-        run: poetry run mypy --ignore-missing-imports --no-error-summary dyana
+        run: uv run mypy --ignore-missing-imports --no-error-summary dyana
 
       - name: Test
-        run: poetry run pytest dyana
+        run: uv run pytest dyana

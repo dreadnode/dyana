@@ -22,37 +22,36 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@b8f6fe29ba2eb78e0d45ccbf41cd14154c4e25b2
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
         with:
-          poetry-version: "1.8.4"
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
+          enable-cache: true
 
       - name: Install package
-        run: poetry install --no-dev
+        run: uv sync
 
       - name: Validate version
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          POETRY_VERSION=$(poetry version -s)
+          PROJECT_VERSION=$(python - <<'PY'
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              print(tomllib.load(f)["project"]["version"])
+          PY
+          )
 
           if ! [[ $TAG_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid tag format: $TAG_VERSION. Must be vX.X.X"
             exit 1
           fi
-          
-          if [ "$TAG_VERSION" != "$POETRY_VERSION" ]; then
-            echo "Tag ($TAG_VERSION) doesn't match pyproject.toml ($POETRY_VERSION)"
+
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "Tag ($TAG_VERSION) doesn't match pyproject.toml ($PROJECT_VERSION)"
             exit 1
           fi
 
       - name: Build package
-        run: |
-          poetry build
+        run: uv build
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
