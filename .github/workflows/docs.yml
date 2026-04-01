@@ -21,16 +21,13 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@b8f6fe29ba2eb78e0d45ccbf41cd14154c4e25b2
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
+      - name: Setup uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
+        with:
+          enable-cache: true
 
       - name: Install docs dependencies
-        run: poetry install --with docs
+        run: uv sync --group docs
 
       - name: Build docs
-        run: poetry run mkdocs build --strict
+        run: uv run mkdocs build --strict
