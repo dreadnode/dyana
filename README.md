@@ -50,6 +50,22 @@ To uninstall, run:
 pip uninstall dyana
 ```
 
+## Development
+
+Set up a local development environment with uv:
+
+```bash
+uv sync --all-extras --group dev --group docs
+```
+
+Run the main checks with:
+
+```bash
+uv run ruff check dyana
+uv run mypy --ignore-missing-imports --no-error-summary dyana
+uv run pytest dyana
+```
+
 ## Usage
 
 See our docs on dyana usage [here](https://docs.dreadnode.io/open-source/dyana/basic-usage)

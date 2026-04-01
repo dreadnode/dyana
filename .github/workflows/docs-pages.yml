@@ -28,24 +28,21 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@b8f6fe29ba2eb78e0d45ccbf41cd14154c4e25b2
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
+      - name: Setup uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
+        with:
+          enable-cache: true
 
       - name: Install docs dependencies
-        run: poetry install --with docs
+        run: uv sync --group docs
 
       - name: Build docs
-        run: poetry run mkdocs build --strict
+        run: uv run mkdocs build --strict
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
