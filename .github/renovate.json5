@@ -21,9 +21,6 @@
   pep621: {
     fileMatch: ["pyproject.toml"],
   },
-  uv: {
-    fileMatch: ["pyproject.toml"],
-  },
   pip_requirements: {
     fileMatch: [
       "requirements-test.txt",
@@ -34,7 +31,7 @@
   },
   packageRules: [
     {
-      matchManagers: ["pep621", "uv", "pip_requirements"],
+      matchManagers: ["pep621", "pip_requirements"],
       matchPackagePatterns: ["^pytest"],
       groupName: "pytest packages",
       groupSlug: "pytest",
