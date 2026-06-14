@@ -13,7 +13,7 @@ dependencies = [
     "typer>=0.26.7,<0.27",
     "pydantic>=2.9.2,<3",
     "docker>=7.1.0,<8",
-    "rich>=14.0.0,<15",
+    "rich>=15,<16",
     "pydantic-yaml>=1.4.0,<2",
 ]
 
