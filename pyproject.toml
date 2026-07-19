@@ -28,7 +28,7 @@ dyana = "dyana.__main__:run"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.8.0,<2",
+    "mypy>=2.3,<3",
     "ruff>=0.15.0,<0.16",
     "pre-commit>=4.0.0,<5",
     "pytest>=9.0.0,<10",
