@@ -247,12 +247,15 @@ wheels = [
 
 [[package]]
 name = "cysimdjson"
-version = "24.12"
+version = "26.27"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/a7/cfbd45366bdfce666b38467eb71da78cc0dfef1ac1a02092ce7bb8cc9347/cysimdjson-26.27.tar.gz", hash = "sha256:9a54533b43b11fc1e7f6aee1daa41b27b4ed33b62b53f18b7547728b47c0036c", size = 1162846, upload-time = "2026-06-30T11:28:58.159Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/16/93c42942a0d9d95a71550158ba2dc36dcc76bc363110232f783570def74b/cysimdjson-24.12-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4f1bca0c3a1b4be798266565b951fad85d38c386605af63928cda02ac28155cc", size = 2286239, upload-time = "2024-03-22T14:49:55.247Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/0d/4edd4412a1dfe78d1401c31988260034141381f06a9f2f3bb9b95a1b6ffc/cysimdjson-24.12-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7d8c66262e6905a7c05c9663f5ef1176db292c4cf3091509ece2f4fee0218573", size = 2303032, upload-time = "2024-03-22T14:49:59.053Z" },
-    { url = "https://files.pythonhosted.org/packages/fa/30/4e6fcfa347e2538c75b79e5666e9c57bfb49d25a167877fba2dcce997e68/cysimdjson-24.12-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e23dceed2d27f778362cdf3f25bcae1f74a024fc3393f0d9e04f1556fff217d5", size = 2304976, upload-time = "2024-03-22T14:50:01.25Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/7e/bba813157a25ad50dd7c83fa262e9be1ad4490412144d134e619642ca2d9/cysimdjson-26.27-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:79451a36fc0b84f6039dad797b60c1393c5f983af2452ff0753b51e8de42406b", size = 2294084, upload-time = "2026-06-30T11:28:46.318Z" },
+    { url = "https://files.pythonhosted.org/packages/86/7c/24767edfd7ff8f5ab003efc850ba3468a7781367da92c5124e277dfc4a7f/cysimdjson-26.27-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5b0680e5cc6dc2f46693436a377d3a3075347e3ad2504a5d1f9557a6684ff7ce", size = 2309934, upload-time = "2026-06-30T11:28:48.428Z" },
+    { url = "https://files.pythonhosted.org/packages/99/93/d5e3c1ea7d57f20ba133f793f6ed2bdf8f65f2db94ad85fcca8f2dcda7aa/cysimdjson-26.27-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:14b60391b87281337deb3477c0659c9c2f5930964de2b50a4245437e6f404bc3", size = 2308230, upload-time = "2026-06-30T11:28:50.328Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/cd/4ec31e57073f71d6401e8c9343467818178bfd89989233501e7dcbbe2e9a/cysimdjson-26.27-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c759b4983af8016df0856ac1ba1a01101ec8c0aac0644c0015c86140976dbba5", size = 2305584, upload-time = "2026-06-30T11:28:52.321Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/16/19a7317333f1412ccde2e1b4be42bbd77f035dcdf36cc0a6122b073d8fd8/cysimdjson-26.27-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:f64c9026257e321c1fc04f1bce93b62e011e7a30096ba750cedc7a28e551eef4", size = 2298738, upload-time = "2026-06-30T11:28:54.235Z" },
 ]
 
 [[package]]
@@ -312,7 +315,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cysimdjson", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'fast-json'", specifier = "==24.12" },
+    { name = "cysimdjson", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'fast-json'", specifier = "==26.27" },
     { name = "docker", specifier = ">=7.1.0,<8" },
     { name = "pydantic", specifier = ">=2.9.2,<3" },
     { name = "pydantic-yaml", specifier = ">=1.4.0,<2" },

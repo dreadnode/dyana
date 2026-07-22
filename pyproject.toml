@@ -21,7 +21,7 @@ dependencies = [
 Repository = "https://github.com/dreadnode/dyana"
 
 [project.optional-dependencies]
-fast-json = ["cysimdjson==24.12; platform_system == 'Linux' and platform_machine == 'x86_64'"]
+fast-json = ["cysimdjson==26.27; platform_system == 'Linux' and platform_machine == 'x86_64'"]
 
 [project.scripts]
 dyana = "dyana.__main__:run"
