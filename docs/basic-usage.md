@@ -12,6 +12,30 @@ Show help for a specific loader:
 dyana help automodel
 ```
 
+Plan model choices against the current machine before tracing:
+
+```bash
+dyana fit --use-case coding --top-k 5
+```
+
+Emit machine-readable fit recommendations:
+
+```bash
+dyana fit --use-case general --json
+```
+
+Restrict the planner to a specific runtime and memory budget:
+
+```bash
+dyana fit --use-case coding --runtime ollama --max-memory-gb 12 --explain-excluded
+```
+
+Plan specifically for Dyana's built-in automodel loader:
+
+```bash
+dyana fit --use-case coding --runtime automodel
+```
+
 Create a trace file for a loader run:
 
 ```bash
@@ -35,6 +59,8 @@ Show a summary of a trace file:
 ```bash
 dyana summary --trace-path trace.json
 ```
+
+`dyana fit` is host-side only. It does not start Docker, pull models, or execute artifacts. It is intended as a quick planning step before a real traced run.
 
 ## Default Safeguards
 

@@ -30,6 +30,8 @@
 
 Dyana is a sandbox environment using Docker and [Tracee](https://github.com/aquasecurity/tracee) for loading, running and profiling a wide range of files, including machine learning models, ELF executables, Pickle serialized files, Javascripts [and more](https://docs.dreadnode.io/open-source/dyana/topics/loaders). It provides detailed insights into GPU memory usage, filesystem interactions, network requests, and security related events.
 
+It also includes a lightweight host-side planning command, `dyana fit`, that recommends models likely to fit the current machine based on available RAM, GPU memory, and detected local runtimes.
+
 ## Installation
 
 Install with:
@@ -69,6 +71,24 @@ uv run pytest dyana
 ## Usage
 
 See our docs on dyana usage [here](https://docs.dreadnode.io/open-source/dyana/basic-usage)
+
+Quick example:
+
+```bash
+dyana fit --use-case coding --top-k 5
+```
+
+Constrain the recommendation surface:
+
+```bash
+dyana fit --use-case coding --runtime ollama --max-memory-gb 12 --explain-excluded
+```
+
+Get Dyana-native recommendations for the `automodel` loader:
+
+```bash
+dyana fit --use-case coding --runtime automodel
+```
 
 ## License
 
