@@ -1,0 +1,16 @@
+description: Analyzes SafeTensors model files for structural integrity and security issues.
+
+gpu: false
+
+args:
+  - name: safetensors
+    description: Path to the SafeTensors file to analyze.
+    required: true
+    volume: true
+
+examples:
+  - description: "Analyze a SafeTensors file:"
+    command: dyana trace --loader safetensors --safetensors /path/to/model.safetensors
+
+  - description: "Analyze with verbose output:"
+    command: dyana trace --loader safetensors --safetensors /path/to/model.safetensors --verbose
