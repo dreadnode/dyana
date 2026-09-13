@@ -426,3 +426,67 @@ def view_security_events(trace: dict[str, t.Any]) -> None:
             rich_print(f"  * {signature} ([dim]{category}[/], {severity_fmt(severity_level)})")
 
         rich_print()
+
+
+def _view_pytorch_extra(extra: dict[str, t.Any]) -> None:
+    file_structure = extra.get("file_structure")
+    if file_structure:
+        rich_print("[bold yellow]File Structure:[/]")
+        rich_print(f"  File size      : {sizeof_fmt(file_structure['file_size'])}")
+        if file_structure["is_zip"]:
+            rich_print("  Format         : ZIP archive (modern PyTorch)")
+            if file_structure.get("zip_entries"):
+                rich_print(f"  ZIP entries    : {len(file_structure['zip_entries'])}")
+            if file_structure.get("data_files"):
+                total = sum(d["size"] for d in file_structure["data_files"])
+                rich_print(f"  Data files     : {len(file_structure['data_files'])} ({sizeof_fmt(total)})")
+        elif file_structure["is_legacy_pickle"]:
+            rich_print("  Format         : legacy pickle")
+        rich_print()
+
+    pickle_analysis = extra.get("pickle_analysis")
+    if pickle_analysis:
+        rich_print("[bold yellow]Pickle Analysis:[/]")
+        rich_print(f"  Global imports : {len(pickle_analysis['global_imports'])}")
+        dangerous = pickle_analysis.get("dangerous_ops_count", 0)
+        if dangerous > 0:
+            rich_print(f"  Dangerous ops  : [bold red]{dangerous}[/]")
+        else:
+            rich_print("  Dangerous ops  : [green]0[/]")
+
+        if pickle_analysis.get("opcode_distribution"):
+            top = sorted(pickle_analysis["opcode_distribution"].items(), key=lambda x: x[1], reverse=True)[:8]
+            dist = ", ".join(f"{k}: {v}" for k, v in top)
+            rich_print(f"  Top opcodes    : {dist}")
+        rich_print()
+
+        if pickle_analysis.get("global_imports"):
+            rich_print("[bold yellow]Global Imports:[/]")
+            for g in pickle_analysis["global_imports"][:15]:
+                rich_print(f"  * {g}")
+            if len(pickle_analysis["global_imports"]) > 15:
+                rich_print(f"  [dim]... and {len(pickle_analysis['global_imports']) - 15} more[/]")
+            rich_print()
+
+    findings = extra.get("findings")
+    if findings:
+        has_any = findings.get("errors") or findings.get("warnings") or findings.get("info")
+        if has_any:
+            rich_print("[bold yellow]Findings:[/]")
+            for error in findings.get("errors", []):
+                rich_print(f"  * [bold red]ERROR[/]   : {error}")
+            for warning in findings.get("warnings", []):
+                rich_print(f"  * [yellow]WARNING[/] : {warning}")
+            for info_msg in findings.get("info", []):
+                rich_print(f"  * [dim]INFO[/]    : {info_msg}")
+            rich_print()
+
+
+def view_extra(run: dict[str, t.Any]) -> None:
+    extra = run.get("extra")
+    if not extra:
+        return
+
+    loader_name = run.get("loader_name", "")
+    if loader_name == "pytorch":
+        _view_pytorch_extra(extra)

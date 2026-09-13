@@ -20,6 +20,7 @@ from dyana.tracer.tracee import Tracer
 from dyana.view import (
     view_disk_events,
     view_disk_usage,
+    view_extra,
     view_gpus,
     view_header,
     view_imports,
@@ -189,3 +190,4 @@ def summary(trace_path: pathlib.Path = typer.Option(help="Path to the trace file
         view_legacy_extra(trace["run"])
     else:
         view_imports(trace["run"]["stages"])
+        view_extra(trace["run"])
