@@ -1,0 +1,16 @@
+description: Analyzes PyTorch checkpoint files for suspicious pickle opcodes and structural integrity.
+
+gpu: false
+
+args:
+  - name: pytorch
+    description: Path to the PyTorch checkpoint file (.pt or .pth) to analyze.
+    required: true
+    volume: true
+
+examples:
+  - description: "Analyze a PyTorch checkpoint:"
+    command: dyana trace --loader pytorch --pytorch /path/to/model.pt
+
+  - description: "Analyze with verbose output:"
+    command: dyana trace --loader pytorch --pytorch /path/to/model.pt --verbose
