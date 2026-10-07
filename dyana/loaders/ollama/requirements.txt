@@ -1,2 +1,2 @@
-ollama==0.6.2
+ollama==0.6.3
 pydantic>=2.0.0
