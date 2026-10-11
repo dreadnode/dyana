@@ -1,0 +1,68 @@
+[
+  {
+    "id": "qwen25-coder-7b",
+    "name": "Qwen2.5-Coder 7B Instruct",
+    "family": "qwen",
+    "use_cases": ["coding", "chat"],
+    "params_b": 7.0,
+    "context_k": 128,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["qwen2.5-coder:7b"]
+  },
+  {
+    "id": "qwen25-coder-14b",
+    "name": "Qwen2.5-Coder 14B Instruct",
+    "family": "qwen",
+    "use_cases": ["coding", "chat"],
+    "params_b": 14.0,
+    "context_k": 128,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["qwen2.5-coder:14b"]
+  },
+  {
+    "id": "deepseek-r1-distill-qwen-7b",
+    "name": "DeepSeek-R1-Distill-Qwen-7B",
+    "family": "deepseek",
+    "use_cases": ["reasoning", "coding"],
+    "params_b": 7.0,
+    "context_k": 32,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["deepseek-r1-distill-qwen:7b"]
+  },
+  {
+    "id": "llama31-8b",
+    "name": "Llama 3.1 8B Instruct",
+    "family": "llama",
+    "use_cases": ["chat", "general"],
+    "params_b": 8.0,
+    "context_k": 128,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["llama3.1:8b"]
+  },
+  {
+    "id": "qwen25-3b",
+    "name": "Qwen2.5 3B Instruct",
+    "family": "qwen",
+    "use_cases": ["chat", "general"],
+    "params_b": 3.0,
+    "context_k": 32,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["qwen2.5:3b"]
+  },
+  {
+    "id": "gemma3-4b",
+    "name": "Gemma 3 4B Instruct",
+    "family": "gemma",
+    "use_cases": ["chat", "general", "coding"],
+    "params_b": 4.0,
+    "context_k": 128,
+    "supported_providers": ["automodel", "mlx", "ollama", "llama_cpp"],
+    "supported_quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "aliases": ["gemma3:4b"]
+  }
+]

@@ -9,6 +9,7 @@ nav:
       - Overview: index.md
       - Install: install.md
       - Basic Usage: basic-usage.md
+      - Fit Planning: fit.md
   - Topics:
       - Loaders: topics/loaders.md
 

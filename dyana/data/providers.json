@@ -1,0 +1,42 @@
+[
+  {
+    "id": "automodel",
+    "name": "Dyana AutoModel",
+    "runtime_key": "automodel",
+    "supported_modes": ["gpu", "cpu", "unified"],
+    "preferred_on": ["gpu", "unified", "cpu"],
+    "quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "artifact_hint": "Use a local Hugging Face model directory or weights path with Dyana's automodel loader.",
+    "invocation_template": "dyana trace --loader automodel -- --model /path/to/{model_id}"
+  },
+  {
+    "id": "mlx",
+    "name": "MLX",
+    "runtime_key": "mlx",
+    "supported_modes": ["unified"],
+    "preferred_on": ["unified"],
+    "quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "artifact_hint": "Use MLX-converted weights or an MLX-native model package.",
+    "invocation_template": "mlx_lm.generate --model {model_id}"
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama",
+    "runtime_key": "ollama",
+    "supported_modes": ["gpu", "cpu", "unified"],
+    "preferred_on": ["gpu", "unified"],
+    "quantizations": ["Q4_K_M", "Q6_K", "Q8_0"],
+    "artifact_hint": "Use an Ollama model tag or local Modelfile import.",
+    "invocation_template": "ollama run {model_id}"
+  },
+  {
+    "id": "llama_cpp",
+    "name": "llama.cpp",
+    "runtime_key": "llama_cpp",
+    "supported_modes": ["gpu", "cpu", "unified"],
+    "preferred_on": ["gpu", "cpu", "unified"],
+    "quantizations": ["Q4_K_M", "Q6_K", "Q8_0", "F16"],
+    "artifact_hint": "Use a GGUF artifact compatible with llama.cpp.",
+    "invocation_template": "llama-cli -m /path/to/{model_id}.gguf"
+  }
+]
