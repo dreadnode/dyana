@@ -48,7 +48,7 @@ class LoaderSettings(BaseModel):
                 return arg
 
             elif arg.startswith(f"{arg_name}="):
-                return arg.split("=")[1]
+                return arg.split("=", 1)[1]
 
         return arg_name if found_pre else None
 
