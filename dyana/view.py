@@ -102,6 +102,69 @@ def severity_fmt(level: int) -> str:
         return "[bold dim]no severity[/]"
 
 
+def view_fit(result: dict[str, t.Any]) -> None:
+    hardware = result["hardware"]
+    rich_print("[bold cyan]Hardware:[/]")
+    rich_print(f"  Platform      : {hardware['platform']} ({hardware['arch']})")
+    rich_print(f"  System RAM    : {hardware['total_ram_gb']} GiB")
+    if hardware.get("gpu_name"):
+        rich_print(
+            f"  GPU           : {hardware['gpu_name']} x{hardware['gpu_count']} "
+            f"({hardware.get('total_vram_gb', 0)} GiB)"
+        )
+    else:
+        rich_print("  GPU           : none detected")
+
+    runtimes = [name for name, enabled in hardware["runtimes"].items() if enabled]
+    rich_print(f"  Runtimes      : {', '.join(runtimes) if runtimes else 'none detected'}")
+    if result.get("runtime_filter"):
+        rich_print(f"  Runtime Filter: {result['runtime_filter']}")
+    if result.get("max_memory_gb") is not None:
+        rich_print(f"  Max Memory    : {result['max_memory_gb']} GiB")
+    rich_print()
+
+    rich_print(f"[bold cyan]Recommendations For {result['use_case'].title()}:[/]")
+    recommendations = result.get("recommendations", [])
+    if not recommendations:
+        rich_print("  No viable recommendations found for the detected hardware.")
+        rich_print()
+        return
+
+    table = Table(box=box.ROUNDED)
+    table.add_column("Model", style="green")
+    table.add_column("Runtime", style="cyan")
+    table.add_column("Quant")
+    table.add_column("Mode")
+    table.add_column("Est. Mem")
+    table.add_column("Score")
+    table.add_column("Hint")
+
+    for recommendation in recommendations:
+        table.add_row(
+            recommendation["model"],
+            recommendation["runtime"],
+            recommendation["quantization"],
+            recommendation["mode"],
+            f"{recommendation['estimated_memory_gb']} GiB",
+            str(recommendation["score"]),
+            recommendation["artifact_hint"],
+        )
+
+    rich_print(table)
+    rich_print()
+    for recommendation in recommendations:
+        rich_print(f"  * [bold]{recommendation['model']}[/] - {recommendation['rationale']}")
+        rich_print(f"    next step: {recommendation['invocation_hint']}")
+
+    excluded = result.get("excluded", [])
+    if excluded:
+        rich_print()
+        rich_print("[bold cyan]Excluded:[/]")
+        for item in excluded:
+            rich_print(f"  * [bold]{item['model']}[/] via {item['provider']} - {item['reason']}")
+    rich_print()
+
+
 def view_header(trace: dict[str, t.Any], is_legacy: bool) -> None:
     run = trace["run"]
     if is_legacy:

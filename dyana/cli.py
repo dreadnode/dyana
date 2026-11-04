@@ -2,6 +2,11 @@ import json
 import pathlib
 import platform as platform_pkg
 
+import typer
+from rich import box
+from rich import print as rich_print
+from rich.table import Table
+
 try:
     import cysimdjson
 
@@ -9,17 +14,14 @@ try:
 except ImportError:
     _HAS_CYSIMDJSON = False
 
-import typer
-from rich import box
-from rich import print as rich_print
-from rich.table import Table
-
 import dyana.loaders as loaders_pkg
+from dyana.fit import detect_hardware, fit_result_json, recommend_models
 from dyana.loaders.loader import Loader
 from dyana.tracer.tracee import Tracer
 from dyana.view import (
     view_disk_events,
     view_disk_usage,
+    view_fit,
     view_gpus,
     view_header,
     view_imports,
@@ -43,6 +45,35 @@ cli = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Blackbox profiler.",
 )
+
+
+@cli.command(help="Recommend models that fit the current machine.")
+def fit(
+    use_case: str = typer.Option(help="Target workload, e.g. coding, chat, reasoning, general.", default="general"),
+    top_k: int = typer.Option(help="Number of recommendations to return.", default=5),
+    runtime: str | None = typer.Option(help="Limit results to a specific runtime, e.g. ollama, mlx, llama_cpp.", default=None),
+    max_memory_gb: float | None = typer.Option(help="Override the available memory budget in GiB.", default=None),
+    preference: str = typer.Option(help="Ranking preference: balanced, quality, or speed.", default="balanced"),
+    explain_excluded: bool = typer.Option(False, help="Include a short explanation for excluded candidates."),
+    json_output: bool = typer.Option(False, "--json", help="Emit recommendations as JSON."),
+) -> None:
+    if preference not in {"balanced", "quality", "speed"}:
+        raise typer.BadParameter("preference must be one of: balanced, quality, speed")
+
+    result = recommend_models(
+        detect_hardware(),
+        use_case=use_case,
+        top_k=top_k,
+        runtime=runtime,
+        max_memory_gb=max_memory_gb,
+        preference=preference,
+        explain_excluded=explain_excluded,
+    )
+
+    if json_output:
+        rich_print(fit_result_json(result))
+    else:
+        view_fit(result.model_dump())
 
 
 @cli.command(

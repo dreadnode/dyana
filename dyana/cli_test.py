@@ -49,6 +49,15 @@ class TestCLIHelp:
         assert result.exit_code == 0
         assert "--build" in _strip_ansi(result.output)
 
+    def test_fit_help(self) -> None:
+        result = runner.invoke(cli, ["fit", "--help"])
+        assert result.exit_code == 0
+        output = _strip_ansi(result.output)
+        assert "--use-case" in output
+        assert "--top-k" in output
+        assert "--runtime" in output
+        assert "--max-memory-gb" in output
+
 
 class TestSummaryCommand:
     def test_summary_with_modern_trace(self, tmp_path: t.Any) -> None:
@@ -135,6 +144,72 @@ class TestSummaryCommand:
     def test_summary_missing_file(self) -> None:
         result = runner.invoke(cli, ["summary", "--trace-path", "/nonexistent/trace.json"])
         assert result.exit_code != 0
+
+
+class TestFitCommand:
+    def test_fit_text_output(self) -> None:
+        fake_result: dict[str, t.Any] = {
+            "hardware": {
+                "platform": "Linux",
+                "arch": "x86_64",
+                "total_ram_gb": 64.0,
+                "gpu_name": "RTX 4090",
+                "gpu_count": 1,
+                "total_vram_gb": 24.0,
+                "unified_memory": False,
+                "runtimes": {"automodel": True, "ollama": True, "llama_cpp": False, "mlx": False},
+            },
+            "use_case": "coding",
+            "runtime_filter": None,
+            "max_memory_gb": None,
+            "recommendations": [
+                {
+                    "model_id": "qwen25-coder-7b",
+                    "model": "Qwen2.5-Coder 7B Instruct",
+                    "runtime": "ollama",
+                    "provider": "Ollama",
+                    "quantization": "Q8_0",
+                    "mode": "gpu",
+                    "estimated_memory_gb": 8.5,
+                    "score": 92,
+                    "rationale": "Fits comfortably.",
+                    "artifact_hint": "Use an Ollama model tag.",
+                    "invocation_hint": "ollama run qwen2.5-coder:7b",
+                }
+            ],
+            "excluded": [],
+        }
+
+        with (
+            patch("dyana.cli.detect_hardware"),
+            patch("dyana.cli.recommend_models") as mock_recommend,
+        ):
+            mock_recommend.return_value.model_dump.return_value = fake_result
+            result = runner.invoke(cli, ["fit", "--use-case", "coding"])
+
+        assert result.exit_code == 0
+        output = _strip_ansi(result.output)
+        assert "Hardware" in output
+        assert "Qwen2.5-Coder 7B Instruct" in output
+        assert "ollama run qwen2.5-coder:7b" in output
+        assert "automodel" in output
+
+    def test_fit_json_output(self) -> None:
+        payload = json.dumps({"use_case": "general", "recommendations": [], "excluded": []})
+        with (
+            patch("dyana.cli.detect_hardware"),
+            patch("dyana.cli.recommend_models"),
+            patch("dyana.cli.fit_result_json", return_value=payload),
+        ):
+            result = runner.invoke(cli, ["fit", "--json"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["use_case"] == "general"
+
+    def test_fit_rejects_invalid_preference(self) -> None:
+        result = runner.invoke(cli, ["fit", "--preference", "unknown"])
+        assert result.exit_code == 2
+        assert "preference must be one of" in _strip_ansi(result.output)
 
 
 def _noop_loader_init(self: t.Any, **kwargs: t.Any) -> None:
