@@ -38,6 +38,25 @@ def test_parse_args() -> None:
     assert parsed_args[1] == ParsedArgument(name="data", value="/path/to/data", volume=True)
 
 
+def test_parse_args_with_equals_in_value() -> None:
+    settings = LoaderSettings(
+        description="test loader", args=[LoaderArgument(name="package", description="Package expression")]
+    )
+
+    for args in (["--package", "offline-demo==1.2"], ["--package=offline-demo==1.2"]):
+        assert settings.parse_args(args) == [ParsedArgument(name="package", value="offline-demo==1.2")]
+
+
+def test_parse_build_args_with_equals_in_value() -> None:
+    settings = LoaderSettings(description="test loader", build_args={"extra-requirements": "EXTRA_REQUIREMENTS"})
+
+    for args in (
+        ["--extra-requirements", "offline-demo==1.2 another==2.3"],
+        ["--extra-requirements=offline-demo==1.2 another==2.3"],
+    ):
+        assert settings.parse_build_args(args) == {"EXTRA_REQUIREMENTS": "offline-demo==1.2 another==2.3"}
+
+
 def test_parse_args_with_default() -> None:
     settings = LoaderSettings(
         description="test loader", args=[LoaderArgument(name="model", description="Model to use", default="gpt2")]
