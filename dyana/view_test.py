@@ -5,6 +5,7 @@ from dyana.view import (
     severity_fmt,
     view_disk_events,
     view_disk_usage,
+    view_extra,
     view_header,
     view_network_events,
     view_process_executions,
@@ -432,3 +433,123 @@ class TestViewDiskUsage:
             assert "Disk Usage" in output
             assert "start" in output
             assert "end" in output
+
+
+class TestViewExtra:
+    def test_no_extra(self) -> None:
+        run: dict[str, t.Any] = {"loader_name": "gguf"}
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
+
+    def test_gguf_file_structure(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "file_structure": {"file_size_bytes": 4096000, "version": 3, "magic_valid": True},
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "File Structure" in output
+            assert "valid" in output
+            assert "3" in output
+
+    def test_gguf_metadata(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "metadata": {
+                    "architecture": "llama",
+                    "model_name": "test-model",
+                    "context_length": 4096,
+                    "total_metadata_fields": 25,
+                },
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Model Metadata" in output
+            assert "llama" in output
+            assert "test-model" in output
+            assert "4096" in output
+
+    def test_gguf_template_with_errors(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "chat_template_length": 500,
+                "template_findings": {
+                    "errors": ["Malicious pattern detected: Python dunder access: __class__"],
+                    "warnings": ["Obfuscation detected: Base64 encoding reference"],
+                    "info": [],
+                },
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Chat Template Analysis" in output
+            assert "ERROR" in output
+            assert "__class__" in output
+            assert "WARNING" in output
+            assert "Base64" in output
+
+    def test_gguf_template_clean(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "chat_template_length": 200,
+                "template_findings": {"errors": [], "warnings": [], "info": []},
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "No security issues" in output
+
+    def test_gguf_template_absent(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "chat_template_length": 0,
+                "template_findings": {"errors": [], "warnings": [], "info": []},
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "No chat template" in output
+
+    def test_gguf_tensors(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "gguf",
+            "extra": {
+                "tensor_count": 250,
+                "tensor_sample": [
+                    {"name": "blk.0.attn_q.weight", "shape": [4096, 4096], "type": "Q4_0"},
+                    {"name": "blk.0.attn_k.weight", "shape": [1024, 4096], "type": "Q4_0"},
+                ],
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Tensors" in output
+            assert "250" in output
+            assert "attn_q" in output
+            assert "4096x4096" in output
+            assert "240 more" in output
+
+    def test_generic_loader_extra(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "pickle",
+            "extra": {"object_type": "<class 'dict'>", "length": 5},
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Extra" in output
+            assert "object_type" in output

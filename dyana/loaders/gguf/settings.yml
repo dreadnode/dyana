@@ -1,0 +1,14 @@
+description: Analyzes GGUF model files for security issues including malicious chat templates.
+
+args:
+  - name: gguf
+    description: Path to the GGUF model file to analyze.
+    required: true
+    volume: true
+
+examples:
+  - description: "Analyze a GGUF model file:"
+    command: dyana trace --loader gguf --gguf /path/to/model.gguf
+
+  - description: "Analyze with verbose output:"
+    command: dyana trace --loader gguf --gguf /path/to/model.gguf --verbose
