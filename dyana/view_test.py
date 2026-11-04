@@ -5,6 +5,7 @@ from dyana.view import (
     severity_fmt,
     view_disk_events,
     view_disk_usage,
+    view_extra,
     view_header,
     view_network_events,
     view_process_executions,
@@ -432,3 +433,83 @@ class TestViewDiskUsage:
             assert "Disk Usage" in output
             assert "start" in output
             assert "end" in output
+
+
+class TestViewExtra:
+    def test_no_extra(self) -> None:
+        run: dict[str, t.Any] = {"extra": None, "loader_name": "pytorch"}
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
+
+    def test_empty_extra(self) -> None:
+        run: dict[str, t.Any] = {"extra": {}, "loader_name": "pytorch"}
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
+
+    def test_pytorch_file_structure_zip(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "pytorch",
+            "extra": {
+                "file_structure": {
+                    "file_size": 1048576,
+                    "is_zip": True,
+                    "is_legacy_pickle": False,
+                    "zip_entries": [{"filename": "archive/data.pkl"}, {"filename": "archive/data/0"}],
+                    "data_files": [{"name": "archive/data/0", "size": 1024}],
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "File Structure" in output
+            assert "ZIP archive" in output
+
+    def test_pytorch_pickle_analysis(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "pytorch",
+            "extra": {
+                "pickle_analysis": {
+                    "global_imports": ["torch._utils._rebuild_tensor_v2", "collections.OrderedDict"],
+                    "dangerous_ops_count": 3,
+                    "dangerous_ops": [{"opcode": "REDUCE", "reason": "calls a callable"}],
+                    "opcode_distribution": {"GLOBAL": 2, "REDUCE": 3, "BINPUT": 10},
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "Pickle Analysis" in output
+            assert "Global imports" in output
+            assert "torch._utils._rebuild_tensor_v2" in output
+
+    def test_pytorch_findings(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "pytorch",
+            "extra": {
+                "findings": {
+                    "errors": ["suspicious global import: 'os.system'"],
+                    "warnings": ["unknown global import: 'custom.module'"],
+                    "info": ["2 global imports"],
+                }
+            },
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            output = " ".join(str(c) for c in mock_print.call_args_list)
+            assert "ERROR" in output
+            assert "os.system" in output
+            assert "WARNING" in output
+            assert "INFO" in output
+
+    def test_unknown_loader_no_output(self) -> None:
+        run: dict[str, t.Any] = {
+            "loader_name": "unknown_loader",
+            "extra": {"some_key": "some_value"},
+        }
+        with patch("dyana.view.rich_print") as mock_print:
+            view_extra(run)
+            mock_print.assert_not_called()
